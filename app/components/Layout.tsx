@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ConnectButton } from "@rainbow-me/rainbowkit";
 
 const NAV_ITEMS = [
   { href: "/", label: "Pay", icon: "💸" },
@@ -45,9 +46,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
           {/* Right side */}
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-1.5">
-              <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-              <span className="text-xs text-gray-300 font-mono">Agent #15994</span>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-1.5">
+                <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                <span className="text-xs text-gray-300 font-mono">Agent #15994</span>
+              </div>
+              <ConnectButton />
             </div>
           </div>
         </div>
