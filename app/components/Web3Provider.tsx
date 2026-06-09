@@ -1,6 +1,6 @@
 "use client";
 import { RainbowKitProvider, getDefaultConfig } from "@rainbow-me/rainbowkit";
-import { WagmiProvider } from "wagmi";
+import { WagmiProvider, http } from "wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import "@rainbow-me/rainbowkit/styles.css";
 
@@ -16,6 +16,7 @@ const config = getDefaultConfig({
   appName: "FreelancePay",
   projectId: "2b0b4e6e3c7d4f8a9b0c1d2e3f4a5b6c",
   chains: [arcTestnet],
+  transports: { [arcTestnet.id]: http("https://rpc.testnet.arc.network") },
 });
 
 const queryClient = new QueryClient();
