@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAccount, useWriteContract, useWaitForTransactionReceipt, useChainId, useSwitchChain } from "wagmi";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { parseUnits, isAddress } from "viem";
@@ -31,11 +31,67 @@ export default function Home() {
   const [copied, setCopied]                                            = useState(false);
   const [amount, setAmount]                                            = useState("5");
   const [recipient, setRecipient]                                      = useState("");
+  const [resolvedAddr, setResolvedAddr]                                = useState("");
+  const [mounted, setMounted]                                          = useState(false);
+  const [usernameTaken, setUsernameTaken]                              = useState(false);
+  const [usernameOk, setUsernameOk]                                    = useState(false);
+
+  // Fix hydration - only render wallet-dependent UI client-side
+  useEffect(() => { setMounted(true); }, []);
+
+  // Load saved username when wallet connects
+  useEffect(() => {
+    if (address) {
+      const saved = localStorage.getItem("fp_username_"+address.toLowerCase());
+      if (saved) { setUsername(saved); setSaved(true); }
+    }
+  }, [address]);
+
+  // Resolve recipient: address, username, or pay link URL
+  useEffect(() => {
+    const input = recipient.trim();
+    if (!input) { setResolvedAddr(""); return; }
+    if (isAddress(input)) { setResolvedAddr(input); return; }
+    // Parse pay link URL or plain username
+    const slug = input.match(/pay\/([^/\s]+)/)?.[1] ?? input.toLowerCase().replace(/[^a-z0-9_]/g,"");
+    // Check localStorage registry
+    const fromStorage = localStorage.getItem("fp_addr_"+slug);
+    if (fromStorage && isAddress(fromStorage)) { setResolvedAddr(fromStorage); return; }
+    // Hardcoded map
+    const MAP: Record<string,string> = { "leo":"0x8b0e1414fb67888c9df36490fbdd342d9dc6c64c", "demo":"0x8b0e1414fb67888c9df36490fbdd342d9dc6c64c" };
+    if (MAP[slug]) { setResolvedAddr(MAP[slug]); return; }
+    setResolvedAddr("");
+  }, [recipient]);
+
+  const clearUsername = () => {
+    if (!address) return;
+    const oldSlug = localStorage.getItem("fp_username_"+address.toLowerCase());
+    if (oldSlug) localStorage.removeItem("fp_addr_"+oldSlug);
+    localStorage.removeItem("fp_username_"+address.toLowerCase());
+    setUsername(""); setSaved(false); setUsernameOk(false); setUsernameTaken(false);
+  };
+
+  const saveUsername = () => {
+    if (!address || !username.trim()) return;
+    const slug = username.trim().toLowerCase().replace(/[^a-z0-9_]/g,"");
+    // Check if taken by ANOTHER wallet
+    const existing = localStorage.getItem("fp_addr_"+slug);
+    if (existing && existing !== address.toLowerCase()) {
+      setUsernameTaken(true); setUsernameOk(false); return;
+    }
+    // Release old username if switching
+    const oldSlug = localStorage.getItem("fp_username_"+address.toLowerCase());
+    if (oldSlug && oldSlug !== slug) localStorage.removeItem("fp_addr_"+oldSlug);
+    // Save
+    localStorage.setItem("fp_username_"+address.toLowerCase(), slug);
+    localStorage.setItem("fp_addr_"+slug, address.toLowerCase());
+    setSaved(true); setUsernameTaken(false); setUsernameOk(true);
+  };
 
   const { writeContract, data:txHash, isPending, isError:writeErr, reset } = useWriteContract();
   const { isSuccess }                                                  = useWaitForTransactionReceipt({ hash:txHash });
 
-  const addrOk    = isAddress(recipient);
+  const addrOk    = isAddress(resolvedAddr);
   const onArc     = chainId === ARC_ID;
   const agentId   = isConnected && address ? "#"+address.slice(2,7).toUpperCase() : "—";
   const slug      = saved && username.trim() ? username.trim().toLowerCase().replace(/[^a-z0-9_]/g,"") : address?.toLowerCase() ?? "";
@@ -46,7 +102,7 @@ export default function Home() {
   const send = () => {
     if (!addrOk || !amount) return;
     reset();
-    writeContract({ address:USDC, abi:USDC_ABI, functionName:"transfer", args:[recipient as `0x${string}`, parseUnits(amount,6)] });
+    writeContract({ address:USDC, abi:USDC_ABI, functionName:"transfer", args:[resolvedAddr as `0x${string}`, parseUnits(amount,6)] });
   };
 
   const btnLabel = () => {
@@ -73,7 +129,7 @@ export default function Home() {
 
         {/* HERO */}
         <div style={{textAlign:"center",marginBottom:40}}>
-          <div style={{display:"inline-flex",alignItems:"center",gap:8,background:"#7FB99A12",border:"1px solid #7FB99A33",borderRadius:99,padding:"6px 18px",fontSize:12,color:"#7FB99A",...M,marginBottom:20}}>
+          <div style={{display:"inline-flex",alignItems:"center",gap:8,background:"#7FB99A12",border:"1px solid #7FB99A33",borderRadius:99,padding:"6px 18px",fontSize:13,color:"#7FB99A",...M,marginBottom:20,fontWeight:700}}>
             BUILT ON ARC · ERC-8004 · CIRCLE USDC
           </div>
           <h1 style={{fontSize:52,fontWeight:900,letterSpacing:"-2px",lineHeight:1.05,color:"#E8EDE9",marginBottom:14}}>
@@ -89,8 +145,8 @@ export default function Home() {
 
         {/* PAY LINK */}
         <div style={{background:"linear-gradient(135deg,#111F16,#0D1710)",border:"1px solid #7FB99A55",borderRadius:24,padding:"32px 36px",marginBottom:28}}>
-          <div style={{...M,fontSize:11,color:"#7FB99A",letterSpacing:"0.14em",marginBottom:24}}>// YOUR PAY LINK</div>
-          {!isConnected ? (
+          <div style={{...M,fontSize:14,color:"#7FB99A",letterSpacing:"0.14em",marginBottom:24,fontWeight:700}}>// YOUR PAY LINK</div>
+          {!mounted || !isConnected ? (
             <div style={{display:"flex",flexDirection:"column" as const,alignItems:"center",gap:16,padding:"16px 0 24px"}}>
               <div style={{fontSize:48}}>🔗</div>
               <h2 style={{fontSize:24,fontWeight:800,color:"#E8EDE9"}}>Connect wallet to get your Pay Link</h2>
@@ -101,20 +157,23 @@ export default function Home() {
             <div style={{display:"grid",gridTemplateColumns:"1fr auto",gap:28,alignItems:"center"}}>
               <div>
                 <div style={{marginBottom:20}}>
-                  <div style={{...M,fontSize:11,color:"#7A9E8A",marginBottom:8}}>CUSTOM USERNAME (optional)</div>
+                  <div style={{...M,fontSize:13,color:"#A8C4B0",marginBottom:8,fontWeight:700,letterSpacing:"0.08em"}}>CUSTOM USERNAME (optional)</div>
                   <div style={{display:"flex",gap:10}}>
-                    <input value={username} onChange={e=>{setUsername(e.target.value);setSaved(false);}} placeholder="yourname"
+                    <input value={username} onChange={e=>{setUsername(e.target.value);setSaved(false);setUsernameTaken(false);setUsernameOk(false);}} placeholder="yourname"
                       style={{flex:1,background:"#0E1110",border:"1px solid #2A3830",borderRadius:10,padding:"12px 16px",fontSize:16,fontWeight:600,...M}}/>
-                    <button onClick={()=>setSaved(true)} style={{padding:"12px 20px",borderRadius:10,border:"1px solid #7FB99A33",background:"#7FB99A18",color:"#7FB99A",fontSize:14,fontWeight:700,cursor:"pointer",...M}}>Save</button>
+                    <button onClick={saveUsername} style={{padding:"12px 20px",borderRadius:10,border:"1px solid #7FB99A33",background:"#7FB99A18",color:"#7FB99A",fontSize:14,fontWeight:700,cursor:"pointer",...M}}>Save</button>
+                    {saved && <button onClick={clearUsername} style={{padding:"12px 16px",borderRadius:10,border:"1px solid #3A2020",background:"transparent",color:"#6A4A4A",fontSize:13,fontWeight:600,cursor:"pointer",...M}}>Clear</button>}
                   </div>
-                  <div style={{...M,fontSize:11,color:"#4A6A5A",marginTop:6}}>Letters, numbers, underscore only. Leave blank to use wallet address.</div>
+                  {usernameTaken && <div style={{...M,fontSize:13,color:"#E89090",marginTop:6,fontWeight:600}}>✗ Username already taken by another wallet</div>}
+                  {usernameOk   && <div style={{...M,fontSize:13,color:"#7FB99A",marginTop:6,fontWeight:600}}>✓ Username saved!</div>}
+                  {!usernameTaken && !usernameOk && <div style={{...M,fontSize:12,color:"#7A9E8A",marginTop:6}}>Letters, numbers, underscore only. Leave blank to use wallet address.</div>}
                 </div>
                 <div style={{background:"#0A1208",border:"1px solid #7FB99A44",borderRadius:14,padding:"16px 20px"}}>
-                  <div style={{...M,fontSize:11,color:"#4A6A5A",marginBottom:8}}>YOUR LINK</div>
+                  <div style={{...M,fontSize:13,color:"#8AB8A0",marginBottom:8,fontWeight:600}}>YOUR LINK</div>
                   <div style={{fontSize:18,fontWeight:800,color:"#E8EDE9"}}>
                     earn.arcstation.xyz/pay/<span style={{color:"#7FB99A"}}>{slug ? (slug.startsWith("0x") ? short(slug) : slug) : "..."}</span>
                   </div>
-                  <div style={{...M,fontSize:11,color:"#4A6A5A",marginTop:8}}>Wallet: {short(address)} · Agent {agentId}</div>
+                  <div style={{...M,fontSize:13,color:"#7A9E8A",marginTop:8}}>Wallet: {short(address)} · Agent {agentId}</div>
                 </div>
               </div>
               <div style={{display:"flex",flexDirection:"column" as const,gap:12,minWidth:160}}>
@@ -128,7 +187,7 @@ export default function Home() {
         </div>
 
         {/* STATS */}
-        {isConnected && (
+        {mounted && isConnected && (
           <div className="pop" style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:28}}>
             {([
               ["Agent ID",   agentId,        "ERC-8004 Identity","#7FB99A"],
@@ -137,9 +196,9 @@ export default function Home() {
               ["Wallet",     short(address!), "Connected ✓",     "#A8B5A2"],
             ] as const).map(([l,v,sub,c])=>(
               <div key={l} style={{background:"#111813",border:`1px solid ${l==="Network"&&!onArc?"#C47A7A33":"#1E2820"}`,borderRadius:14,padding:"16px 18px"}}>
-                <div style={{...M,fontSize:11,color:"#4A6A5A",marginBottom:8}}>{l}</div>
+                <div style={{...M,fontSize:13,color:"#8AB8A0",marginBottom:8,fontWeight:600}}>{l}</div>
                 <div style={{fontSize:20,fontWeight:800,color:c,marginBottom:4}}>{v}</div>
-                <div style={{...M,fontSize:11,color:"#4A6A5A"}}>{sub}</div>
+                <div style={{...M,fontSize:12,color:"#7A9E8A"}}>{sub}</div>
               </div>
             ))}
           </div>
@@ -148,20 +207,22 @@ export default function Home() {
         {/* QUICK SEND + FEATURES */}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20,marginBottom:24}}>
           <div style={{background:"#111813",border:"1px solid #1E2820",borderRadius:20,padding:28}}>
-            <div style={{...M,fontSize:11,color:"#7FB99A",marginBottom:14}}>// quick send</div>
+            <div style={{...M,fontSize:14,color:"#7FB99A",marginBottom:14,fontWeight:700}}>// quick send</div>
             <h3 style={{fontSize:20,fontWeight:800,color:"#E8EDE9",marginBottom:6}}>Send USDC</h3>
-            <p style={{color:"#6A8E7A",fontSize:14,marginBottom:20}}>Sent directly from your wallet · No intermediary</p>
+            <p style={{color:"#6A8E7A",fontSize:16,marginBottom:20}}>Sent directly from your wallet · No intermediary</p>
 
             <div style={{marginBottom:14}}>
-              <div style={{...M,fontSize:11,color:"#6A8E7A",marginBottom:8}}>RECIPIENT</div>
+              <div style={{...M,fontSize:13,color:"#A8C4B0",marginBottom:8,fontWeight:700,letterSpacing:"0.08em"}}>RECIPIENT</div>
               <input value={recipient} onChange={e=>setRecipient(e.target.value)} placeholder="0x... or earn.arcstation.xyz/pay/username"
                 style={{width:"100%",background:"#0E1110",border:`1px solid ${recipient&&!addrOk?"#C47A7A55":recipient&&addrOk?"#7FB99A55":"#1E2820"}`,borderRadius:10,padding:"12px 14px",fontSize:13,...M}}/>
-              {recipient&&addrOk&&<div style={{...M,fontSize:11,color:"#7FB99A",marginTop:4}}>✓ Valid address</div>}
-              {recipient&&!addrOk&&<div style={{...M,fontSize:11,color:"#C47A7A",marginTop:4}}>✗ Invalid address</div>}
+              {recipient&&addrOk&&<div style={{...M,fontSize:13,color:"#7FB99A",marginTop:4,fontWeight:600}}>✓ {resolvedAddr.slice(0,10)}...{resolvedAddr.slice(-6)}</div>}
+            {recipient&&!resolvedAddr&&recipient.length>2&&<div style={{...M,fontSize:13,color:"#E89090",marginTop:4,fontWeight:600}}>✗ Address or username not found</div>}
+            {recipient&&resolvedAddr&&!isAddress(recipient)&&<div style={{...M,fontSize:13,color:"#7FB99A",marginTop:4,fontWeight:600}}>✓ Resolved: {resolvedAddr.slice(0,10)}...{resolvedAddr.slice(-6)}</div>}
+              {recipient&&!addrOk&&<div style={{...M,fontSize:13,color:"#E89090",marginTop:4,fontWeight:600}}>✗ Invalid address</div>}
             </div>
 
             <div style={{marginBottom:20}}>
-              <div style={{...M,fontSize:11,color:"#6A8E7A",marginBottom:8}}>AMOUNT (USDC)</div>
+              <div style={{...M,fontSize:13,color:"#A8C4B0",marginBottom:8,fontWeight:700,letterSpacing:"0.08em"}}>AMOUNT (USDC)</div>
               <input value={amount} onChange={e=>setAmount(e.target.value)} type="number" step="0.01"
                 style={{width:"100%",background:"#0E1110",border:"1px solid #1E2820",borderRadius:10,padding:"12px 14px",fontSize:26,fontWeight:800,color:"#E8EDE9",marginBottom:10}}/>
               <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8}}>
@@ -173,7 +234,7 @@ export default function Home() {
               </div>
             </div>
 
-            {!isConnected ? (
+            {!mounted || !isConnected ? (
               <div style={{display:"flex",justifyContent:"center"}}><ConnectButton label="Connect Wallet to Send" /></div>
             ) : (
               <button onClick={btnAction} disabled={isConnected && !(!onArc) && !btnOk}
@@ -221,7 +282,7 @@ export default function Home() {
           </div>
         </div>
 
-        <div style={{...M,fontSize:12,color:"#2A3A30",textAlign:"center" as const}}>
+        <div style={{...M,fontSize:13,color:"#4A6A5A",textAlign:"center" as const}}>
           FreelancePay · ArcStation · Arc Testnet · Circle USDC · ERC-8004 · ERC-8183
         </div>
       </div>

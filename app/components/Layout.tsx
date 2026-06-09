@@ -53,7 +53,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-2 shrink-0">
             <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-1.5">
               <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-              <span className="text-xs text-gray-300 font-mono">Agent {agentId}</span>
+              <span className="text-xs text-gray-300 font-mono" suppressHydrationWarning>Agent {agentId}</span>
             </div>
             <ConnectButton
               label="Connect"
