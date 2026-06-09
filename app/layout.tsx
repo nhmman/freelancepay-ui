@@ -4,7 +4,7 @@ import Web3Provider from "./components/Web3Provider";
 
 export const metadata: Metadata = {
   title: "FreelancePay — AI Payment Agent on Arc",
-  description: "Trustless USDC escrow for Vietnamese freelancers.",
+  description: "Trustless USDC escrow for global freelancers.",
   icons: { icon: "/favicon.png", apple: "/favicon.png" },
 };
 

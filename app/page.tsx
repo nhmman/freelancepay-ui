@@ -50,7 +50,7 @@ export default function Home() {
             Built on Arc · ERC-8004 · Circle USDC
           </div>
           <h1 className="text-5xl font-bold mb-4 bg-gradient-to-b from-white to-gray-400 bg-clip-text text-transparent">
-            The Payment Layer for<br />Vietnamese Freelancers
+            The Payment Layer for<br />Remote Freelancers Worldwide
           </h1>
           <p className="text-gray-400 text-lg max-w-2xl mx-auto">
             Trustless escrow, instant USDC payouts, and on-chain reputation — 
@@ -154,7 +154,7 @@ export default function Home() {
         {/* Bottom banner */}
         <div className="mt-12 bg-gradient-to-r from-blue-500/5 to-violet-500/5 border border-white/5 rounded-2xl p-6 flex items-center justify-between">
           <div>
-            <p className="font-semibold mb-1">2 million Vietnamese freelancers deserve better payment rails</p>
+            <p className="font-semibold mb-1">2 billion remote workers deserve better payment rails</p>
             <p className="text-gray-500 text-sm">No PayPal freezes · No 20% Upwork fees · Instant USDC settlement</p>
           </div>
           <div className="flex items-center gap-3 text-xs text-gray-500">
