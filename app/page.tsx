@@ -173,7 +173,7 @@ export default function Home() {
                   <div style={{fontSize:18,fontWeight:800,color:"#E8EDE9"}}>
                     earn.arcstation.xyz/pay/<span style={{color:"#7FB99A"}}>{slug ? (slug.startsWith("0x") ? short(slug) : slug) : "..."}</span>
                   </div>
-                  <div style={{...M,fontSize:13,color:"#7A9E8A",marginTop:8}}>Wallet: {short(address)} · Agent {agentId}</div>
+                  <div style={{...M,fontSize:13,color:"#7A9E8A",marginTop:8}}>Wallet: {short(address ?? '0x0000000000000000000000000000000000000000')} · Agent {agentId}</div>
                 </div>
               </div>
               <div style={{display:"flex",flexDirection:"column" as const,gap:12,minWidth:160}}>
