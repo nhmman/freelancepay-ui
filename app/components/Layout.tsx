@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { useAccount } from "wagmi";
 
 const NAV_ITEMS = [
   { href: "/", label: "Pay" },
@@ -17,6 +18,8 @@ const NAV_ITEMS = [
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { address, isConnected } = useAccount();
+  const agentId = isConnected && address ? "#"+address.slice(2,7).toUpperCase() : "#——";
   return (
     <div className="min-h-screen bg-[#0a0b0d] text-white font-sans">
       <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/5 bg-[#0a0b0d]/80 backdrop-blur-xl">
@@ -50,7 +53,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-2 shrink-0">
             <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-1.5">
               <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-              <span className="text-xs text-gray-300 font-mono">Agent #15994</span>
+              <span className="text-xs text-gray-300 font-mono">Agent {agentId}</span>
             </div>
             <ConnectButton
               label="Connect"
