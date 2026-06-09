@@ -13,7 +13,6 @@ const NAV_ITEMS = [
   { href: "/portfolio", label: "Portfolio" },
   { href: "/dashboard", label: "Dashboard" },
   { href: "/leaderboard", label: "Leaderboard" },
-  { href: "/leaderboard", label: "🏆 Leaderboard" },
 ];
 
 export default function Layout({ children }: { children: React.ReactNode }) {
