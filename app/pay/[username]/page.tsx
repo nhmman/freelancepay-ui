@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, use } from "react";
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { parseUnits, isAddress } from "viem";
@@ -16,8 +16,8 @@ const shortAddr = (a: string) => a.slice(0,6)+"..."+a.slice(-4);
 const getColor = (s: string) => ["#7FB99A","#7FA8C9","#C4CFBE","#A8B5A2","#9B8EC4","#C4A882"][s.charCodeAt(0)%6];
 const toVND = (u: number) => (u*25400).toLocaleString("en-US")+" ₫";
 
-export default function PayPage({ params }: { params: { username: string } }) {
-  const { username } = params;
+export default function PayPage({ params }: { params: Promise<{ username: string }> }) {
+  const { username } = use(params);
   const [amount, setAmount] = useState("5");
   const [note, setNote] = useState("");
   const [copied, setCopied] = useState(false);
