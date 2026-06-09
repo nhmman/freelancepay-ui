@@ -2,6 +2,7 @@
 import { useState } from "react";
 import Layout from "./components/Layout";
 import Link from "next/link";
+import PayLinkCard from "./components/PayLinkCard";
 
 const FEATURES = [
   { href: "/milestones", icon: "📋", title: "Multi-Milestone", desc: "Project-based escrow with automatic USDC release", color: "from-blue-500/20 to-blue-600/5", border: "border-blue-500/20", tag: "ESCROW" },
@@ -150,6 +151,9 @@ export default function Home() {
             ))}
           </div>
         </div>
+
+        {/* MY PAY LINK */}
+        <PayLinkCard />
 
         {/* Bottom banner */}
         <div className="mt-12 bg-gradient-to-r from-blue-500/5 to-violet-500/5 border border-white/5 rounded-2xl p-6 flex items-center justify-between">

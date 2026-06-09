@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { href: "/invoice", label: "Invoice" },
   { href: "/portfolio", label: "Portfolio" },
   { href: "/dashboard", label: "Dashboard" },
+  { href: "/leaderboard", label: "🏆 Leaderboard" },
 ];
 
 export default function Layout({ children }: { children: React.ReactNode }) {
