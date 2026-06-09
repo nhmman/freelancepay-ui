@@ -1,170 +1,140 @@
 "use client";
 import { useState } from "react";
+import { useAccount } from "wagmi";
 import Layout from "./components/Layout";
 import Link from "next/link";
 import PayLinkCard from "./components/PayLinkCard";
 
 const FEATURES = [
-  { href: "/milestones", icon: "📋", title: "Multi-Milestone", desc: "Project-based escrow with automatic USDC release", color: "from-blue-500/20 to-blue-600/5", border: "border-blue-500/20", tag: "ESCROW" },
-  { href: "/nanopay", icon: "⚡", title: "Nanopayments", desc: "Pay-per-use API calls via Arc x402 protocol", color: "from-yellow-500/20 to-yellow-600/5", border: "border-yellow-500/20", tag: "x402" },
-  { href: "/reputation", icon: "⭐", title: "Reputation Pricing", desc: "ERC-8004 score determines your payment tier", color: "from-purple-500/20 to-purple-600/5", border: "border-purple-500/20", tag: "ERC-8004" },
-  { href: "/jobs", icon: "🤖", title: "Smart Jobs", desc: "On-chain job contracts with deliverable verification", color: "from-green-500/20 to-green-600/5", border: "border-green-500/20", tag: "ERC-8183" },
-  { href: "/invoice", icon: "🧾", title: "AI Invoice", desc: "AI-generated invoices with instant USDC payment", color: "from-pink-500/20 to-pink-600/5", border: "border-pink-500/20", tag: "AI" },
-  { href: "/portfolio", icon: "📊", title: "Portfolio", desc: "Multi-currency balance and FX conversion", color: "from-cyan-500/20 to-cyan-600/5", border: "border-cyan-500/20", tag: "FX" },
+  { href:"/milestones", icon:"📋", title:"Multi-Milestone", desc:"Project-based escrow with automatic USDC release", tag:"ESCROW" },
+  { href:"/nanopay",    icon:"⚡", title:"Nanopayments",    desc:"Pay-per-use API calls via Arc x402 protocol",     tag:"x402"    },
+  { href:"/reputation", icon:"⭐", title:"Reputation",      desc:"ERC-8004 score unlocks better rates and instant settlement", tag:"ERC-8004" },
+  { href:"/jobs",       icon:"🤖", title:"Smart Jobs",      desc:"On-chain job contracts with deliverable verification", tag:"ERC-8183" },
+  { href:"/invoice",    icon:"🧾", title:"AI Invoice",      desc:"AI-generated invoices with one-click USDC payment", tag:"AI" },
+  { href:"/portfolio",  icon:"📊", title:"Portfolio",       desc:"Multi-currency balance, FX rates, payout history", tag:"FX" },
 ];
 
 export default function Home() {
-  const [amount, setAmount] = useState("1.00");
-  const [recipient, setRecipient] = useState("0x8b0e1414fb67888c9df36490fbdd342d9dc6c64c");
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<any>(null);
-  const [error, setError] = useState("");
+  const { address, isConnected } = useAccount();
+  const [amount, setAmount]       = useState("1.00");
+  const [recipient, setRecipient] = useState("");
+  const [loading, setLoading]     = useState(false);
+  const [result, setResult]       = useState<any>(null);
+  const [error, setError]         = useState("");
+  const addrOk = /^0x[a-fA-F0-9]{40}$/.test(recipient);
 
   const handlePayout = async () => {
-    setLoading(true);
-    setError("");
-    setResult(null);
+    if (!addrOk) return;
+    setLoading(true); setError(""); setResult(null);
     try {
-      const res = await fetch("/api/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount, recipientAddress: recipient }),
-      });
+      const res  = await fetch("/api/send", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ amount, recipientAddress: recipient }) });
       const data = await res.json();
-      if (data.success) setResult(data.data);
-      else setError(data.error);
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
+      if (data.success) setResult(data.data); else setError(data.error);
+    } catch(e:any) { setError(e.message); }
+    finally { setLoading(false); }
   };
+
+  const S: React.CSSProperties = { fontFamily:"IBM Plex Mono,monospace" };
 
   return (
     <Layout>
-      <div className="max-w-6xl mx-auto px-6 py-12">
+      <style dangerouslySetInnerHTML={{__html:".fc{transition:all 0.18s ease} .fc:hover{transform:translateY(-2px);border-color:#7FB99A44!important} @keyframes spin{to{transform:rotate(360deg)}}"}} />
+      <div style={{maxWidth:1100,margin:"0 auto",padding:"40px 24px"}}>
 
-        {/* Hero */}
-        <div className="text-center mb-16">
-          <div className="inline-flex items-center gap-2 bg-blue-500/10 border border-blue-500/20 rounded-full px-4 py-1.5 text-blue-400 text-xs font-medium mb-6">
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
-            Built on Arc · ERC-8004 · Circle USDC
+        <div style={{textAlign:"center",marginBottom:44}}>
+          <div style={{display:"inline-flex",alignItems:"center",gap:8,background:"#7FB99A12",border:"1px solid #7FB99A33",borderRadius:99,padding:"5px 16px",fontSize:11,color:"#7FB99A",...S,marginBottom:20}}>
+            BUILT ON ARC · ERC-8004 · CIRCLE USDC
           </div>
-          <h1 className="text-5xl font-bold mb-4 bg-gradient-to-b from-white to-gray-400 bg-clip-text text-transparent">
-            The Payment Layer for<br />Remote Freelancers Worldwide
+          <h1 style={{fontSize:46,fontWeight:900,letterSpacing:"-1.5px",lineHeight:1.1,marginBottom:14,color:"#E8EDE9"}}>
+            The Payment Layer for<br/>
+            <span style={{background:"linear-gradient(135deg,#7FB99A,#A8C4B0,#D7E1D4)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>
+              Remote Freelancers Worldwide
+            </span>
           </h1>
-          <p className="text-gray-400 text-lg max-w-2xl mx-auto">
-            Trustless escrow, instant USDC payouts, and on-chain reputation — 
-            no PayPal, no Upwork fees, no middlemen.
+          <p style={{color:"#7A9E8A",fontSize:16,lineHeight:1.7,maxWidth:520,margin:"0 auto"}}>
+            Trustless escrow, instant USDC payouts, on-chain reputation — no PayPal, no Upwork fees, no middlemen.
           </p>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-4 gap-4 mb-12">
+        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:32}}>
           {[
-            { label: "Agent ID", value: "#15994", sub: "ERC-8004 ✓", color: "text-green-400" },
-            { label: "Reputation", value: "95/100", sub: "Expert Tier ⭐", color: "text-blue-400" },
-            { label: "Network", value: "Arc", sub: "Testnet · 5042002", color: "text-purple-400" },
-            { label: "Protocol", value: "USDC", sub: "Circle Native", color: "text-yellow-400" },
-          ].map((s) => (
-            <div key={s.label} className="bg-white/3 border border-white/8 rounded-2xl p-5 backdrop-blur-sm">
-              <p className="text-gray-500 text-xs mb-2">{s.label}</p>
-              <p className={"text-2xl font-bold " + s.color}>{s.value}</p>
-              <p className="text-gray-600 text-xs mt-1">{s.sub}</p>
+            ["Agent ID",   isConnected&&address ? "#"+address.slice(2,7).toUpperCase() : "—", isConnected?"ERC-8004 ✓":"Connect wallet", "#7FB99A"],
+            ["Reputation", isConnected?"95/100":"—", isConnected?"Expert Tier ⭐":"Connect to check","#7FA8C9"],
+            ["Network",    "Arc",   "Testnet · 5042002","#C4CFBE"],
+            ["Protocol",   "USDC",  "Circle Native","#A8B5A2"],
+          ].map(([l,v,sub,c])=>(
+            <div key={l as string} style={{background:"#111813",border:"1px solid #1E2820",borderRadius:16,padding:"18px 20px"}}>
+              <div style={{...S,fontSize:10,color:"#4A6A5A",marginBottom:8}}>{l}</div>
+              <div style={{fontSize:22,fontWeight:800,color:c as string,marginBottom:4}}>{v}</div>
+              <div style={{...S,fontSize:10,color:"#4A6A5A"}}>{sub}</div>
             </div>
           ))}
         </div>
 
-        <div className="grid grid-cols-3 gap-6">
-          {/* Quick Send */}
-          <div className="col-span-1 bg-white/3 border border-white/8 rounded-2xl p-6 backdrop-blur-sm">
-            <h2 className="font-semibold mb-1 text-lg">Quick Send</h2>
-            <p className="text-gray-500 text-sm mb-6">Release USDC to freelancer instantly</p>
-
-            <div className="space-y-4">
-              <div>
-                <label className="text-xs text-gray-500 mb-1.5 block uppercase tracking-wider">Recipient</label>
-                <input value={recipient} onChange={(e) => setRecipient(e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs font-mono focus:outline-none focus:border-blue-500/50 transition-colors"
-                  placeholder="0x..." />
-              </div>
-
-              <div>
-                <label className="text-xs text-gray-500 mb-1.5 block uppercase tracking-wider">Amount (USDC)</label>
-                <div className="flex gap-2 mb-2">
-                  <input value={amount} onChange={(e) => setAmount(e.target.value)}
-                    className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500/50 transition-colors"
-                    type="number" step="0.01" />
-                </div>
-                <div className="flex gap-2">
-                  {["1", "5", "10", "50"].map((v) => (
-                    <button key={v} onClick={() => setAmount(v)}
-                      className={"flex-1 py-1.5 rounded-lg text-xs font-medium border transition-all " +
-                        (amount === v
-                          ? "bg-blue-500/20 border-blue-500/40 text-blue-400"
-                          : "bg-white/3 border-white/8 text-gray-400 hover:border-white/20")}>
-                      ${v}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <button onClick={handlePayout} disabled={loading}
-                className="w-full bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-500 hover:to-violet-500 disabled:from-gray-700 disabled:to-gray-700 disabled:cursor-not-allowed rounded-xl py-3 font-semibold text-sm transition-all flex items-center justify-center gap-2">
-                {loading ? (
-                  <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Processing...</>
-                ) : (
-                  <>Send {amount} USDC →</>
-                )}
-              </button>
+        <div style={{display:"grid",gridTemplateColumns:"320px 1fr",gap:20,marginBottom:20}}>
+          <div style={{background:"#111813",border:"1px solid #1E2820",borderRadius:20,padding:24}}>
+            <div style={{...S,fontSize:10,color:"#7FB99A",marginBottom:14}}>// quick send</div>
+            <h2 style={{fontSize:17,fontWeight:800,color:"#E8EDE9",marginBottom:4}}>Quick Send</h2>
+            <p style={{color:"#6A8E7A",fontSize:13,marginBottom:20}}>Release USDC to any freelancer instantly</p>
+            <div style={{marginBottom:14}}>
+              <div style={{...S,fontSize:10,color:"#6A8E7A",marginBottom:6}}>RECIPIENT</div>
+              <input value={recipient} onChange={e=>setRecipient(e.target.value)} placeholder="0x..."
+                style={{width:"100%",background:"#0E1110",border:`1px solid ${recipient&&!addrOk?"#C47A7A44":recipient&&addrOk?"#7FB99A44":"#1E2820"}`,borderRadius:10,padding:"10px 12px",fontSize:12,...S,color:"#E8EDE9",outline:"none",boxSizing:"border-box"}} />
+              {recipient&&!addrOk&&<div style={{...S,fontSize:10,color:"#C47A7A",marginTop:4}}>✗ Invalid address</div>}
             </div>
-
-            {error && (
-              <div className="mt-4 bg-red-500/10 border border-red-500/20 rounded-xl p-3 text-red-400 text-xs">{error}</div>
-            )}
-
-            {result && (
-              <div className="mt-4 bg-green-500/10 border border-green-500/20 rounded-xl p-4">
-                <p className="text-green-400 font-medium text-sm mb-2">✓ Payment confirmed</p>
-                <p className="text-gray-400 text-xs mb-1">TX Hash</p>
-                <p className="font-mono text-[10px] text-blue-400 break-all mb-2">{result.txHash}</p>
-                <a href={result.explorerUrl} target="_blank" rel="noopener noreferrer"
-                  className="text-xs text-blue-400 hover:text-blue-300 underline">
-                  View on ArcScan →
-                </a>
+            <div style={{marginBottom:18}}>
+              <div style={{...S,fontSize:10,color:"#6A8E7A",marginBottom:6}}>AMOUNT (USDC)</div>
+              <input value={amount} onChange={e=>setAmount(e.target.value)} type="number" step="0.01"
+                style={{width:"100%",background:"#0E1110",border:"1px solid #1E2820",borderRadius:10,padding:"10px 12px",fontSize:20,fontWeight:700,color:"#E8EDE9",outline:"none",marginBottom:8,boxSizing:"border-box"}} />
+              <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6}}>
+                {["1","5","10","50"].map(v=>(
+                  <button key={v} onClick={()=>setAmount(v)} style={{padding:"7px 0",borderRadius:8,border:`1px solid ${amount===v?"#7FB99A44":"#1E2820"}`,background:amount===v?"#7FB99A18":"#0E1110",color:amount===v?"#7FB99A":"#6A8E7A",fontSize:12,fontWeight:600,cursor:"pointer"}}>
+                    ${v}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <button onClick={handlePayout} disabled={loading||!addrOk}
+              style={{width:"100%",padding:"13px",borderRadius:12,border:"none",cursor:addrOk?"pointer":"not-allowed",background:addrOk?"linear-gradient(135deg,#7FB99A,#5A9A7A)":"#1A2420",color:addrOk?"#0A0F0C":"#4A6A5A",fontSize:14,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+              {loading?(<><div style={{width:16,height:16,border:"2px solid #0A0F0C33",borderTopColor:"#0A0F0C",borderRadius:"50%",animation:"spin 0.7s linear infinite"}}/>Sending...</>):`Send ${amount} USDC →`}
+            </button>
+            {error&&<div style={{marginTop:10,padding:"10px 12px",background:"#1A0E0E",border:"1px solid #3A1818",borderRadius:10,...S,fontSize:11,color:"#C47A7A"}}>✗ {error}</div>}
+            {result&&(
+              <div style={{marginTop:10,padding:"14px",background:"#0A1A10",border:"1px solid #7FB99A33",borderRadius:12}}>
+                <div style={{...S,fontSize:10,color:"#7FB99A",marginBottom:6}}>✓ CONFIRMED</div>
+                <div style={{...S,fontSize:10,color:"#4A6A5A",marginBottom:2}}>TX HASH</div>
+                <div style={{...S,fontSize:10,color:"#7FA8C9",wordBreak:"break-all",marginBottom:6}}>{result.txHash}</div>
+                {result.explorerUrl&&<a href={result.explorerUrl} target="_blank" rel="noopener noreferrer" style={{...S,fontSize:10,color:"#7FB99A"}}>View on ArcScan ↗</a>}
               </div>
             )}
           </div>
 
-          {/* Feature Grid */}
-          <div className="col-span-2 grid grid-cols-2 gap-4">
-            {FEATURES.map((f) => (
-              <Link key={f.href} href={f.href}
-                className={"bg-gradient-to-br " + f.color + " border " + f.border + " rounded-2xl p-5 hover:scale-[1.02] transition-all group"}>
-                <div className="flex items-start justify-between mb-3">
-                  <span className="text-2xl">{f.icon}</span>
-                  <span className="text-[10px] bg-white/10 text-gray-400 px-2 py-0.5 rounded-full font-mono">{f.tag}</span>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gridTemplateRows:"repeat(2,1fr)",gap:12}}>
+            {FEATURES.map(f=>(
+              <Link key={f.href} href={f.href} className="fc"
+                style={{background:"#111813",border:"1px solid #1E2820",borderRadius:16,padding:20,textDecoration:"none",display:"flex",flexDirection:"column"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}}>
+                  <span style={{fontSize:22}}>{f.icon}</span>
+                  <span style={{...S,fontSize:9,color:"#7FB99A",background:"#7FB99A12",border:"1px solid #7FB99A22",padding:"2px 8px",borderRadius:20}}>{f.tag}</span>
                 </div>
-                <h3 className="font-semibold mb-1 group-hover:text-white transition-colors">{f.title}</h3>
-                <p className="text-gray-500 text-xs leading-relaxed">{f.desc}</p>
+                <div style={{fontSize:14,fontWeight:700,color:"#E8EDE9",marginBottom:6}}>{f.title}</div>
+                <div style={{fontSize:12,color:"#6A8E7A",lineHeight:1.6,flex:1}}>{f.desc}</div>
               </Link>
             ))}
           </div>
         </div>
 
-        {/* MY PAY LINK */}
         <PayLinkCard />
 
-        {/* Bottom banner */}
-        <div className="mt-12 bg-gradient-to-r from-blue-500/5 to-violet-500/5 border border-white/5 rounded-2xl p-6 flex items-center justify-between">
+        <div style={{background:"#111813",border:"1px solid #1E2820",borderRadius:14,padding:"20px 28px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:16}}>
           <div>
-            <p className="font-semibold mb-1">2 billion remote workers deserve better payment rails</p>
-            <p className="text-gray-500 text-sm">No PayPal freezes · No 20% Upwork fees · Instant USDC settlement</p>
+            <div style={{fontSize:15,fontWeight:700,color:"#E8EDE9",marginBottom:4}}>2 billion remote workers deserve better payment rails</div>
+            <div style={{fontSize:13,color:"#6A8E7A"}}>No PayPal freezes · No 20% Upwork fees · Instant USDC settlement</div>
           </div>
-          <div className="flex items-center gap-3 text-xs text-gray-500">
-            <span className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5">Arc Testnet</span>
-            <span className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5">Circle USDC</span>
-            <span className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5">ERC-8004</span>
+          <div style={{display:"flex",gap:8}}>
+            {["Arc Testnet","Circle USDC","ERC-8004"].map(t=>(
+              <span key={t} style={{...S,fontSize:11,color:"#6A8E7A",background:"#1A2420",border:"1px solid #1E2820",borderRadius:8,padding:"6px 12px"}}>{t}</span>
+            ))}
           </div>
         </div>
       </div>
