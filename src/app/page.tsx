@@ -1,14 +1,45 @@
 "use client";
 import { useState } from "react";
 
+const LOGO_URL = "https://arcstation.xyz/favicon.png";
+
+type TxRecord = {
+  id: string;
+  recipient: string;
+  amount: string;
+  state: string;
+  txHash: string;
+  explorerUrl?: string;
+  timestamp: Date;
+};
+
+function shortAddr(addr: string) {
+  return addr.slice(0, 6) + "..." + addr.slice(-4);
+}
+
+function isValidAddress(addr: string) {
+  return /^0x[a-fA-F0-9]{40}$/.test(addr);
+}
+
+function isValidAmount(amt: string) {
+  const n = parseFloat(amt);
+  return !isNaN(n) && n > 0 && n <= 10000;
+}
+
 export default function Home() {
   const [amount, setAmount] = useState("1.00");
-  const [recipient, setRecipient] = useState("0x8b0e1414fb67888c9df36490fbdd342d9dc6c64c");
+  const [recipient, setRecipient] = useState("");
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<TxRecord | null>(null);
   const [error, setError] = useState("");
+  const [history, setHistory] = useState<TxRecord[]>([]);
+
+  const addrValid = recipient === "" || isValidAddress(recipient);
+  const amtValid = amount === "" || isValidAmount(amount);
+  const canSubmit = isValidAddress(recipient) && isValidAmount(amount) && !loading;
 
   const handlePayout = async () => {
+    if (!canSubmit) return;
     setLoading(true);
     setError("");
     setResult(null);
@@ -19,8 +50,21 @@ export default function Home() {
         body: JSON.stringify({ amount, recipientAddress: recipient }),
       });
       const data = await res.json();
-      if (data.success) setResult(data.data);
-      else setError(data.error);
+      if (data.success) {
+        const record: TxRecord = {
+          id: Math.random().toString(36).slice(2),
+          recipient,
+          amount,
+          state: data.data?.state ?? "CONFIRMED",
+          txHash: data.data?.txHash ?? "",
+          explorerUrl: data.data?.explorerUrl,
+          timestamp: new Date(),
+        };
+        setResult(record);
+        setHistory(prev => [record, ...prev]);
+      } else {
+        setError(data.error ?? "Unknown error");
+      }
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -28,109 +72,239 @@ export default function Home() {
     }
   };
 
+  const vnd = (usdc: string) => {
+    const n = parseFloat(usdc);
+    if (isNaN(n)) return "";
+    return "≈ " + (n * 25400).toLocaleString("vi-VN") + " ₫";
+  };
+
   return (
-    <main className="min-h-screen bg-gray-950 text-white p-8">
-      <div className="max-w-2xl mx-auto">
-        <div className="flex items-center gap-3 mb-8">
-          <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-xl">💸</div>
+    <div style={{ minHeight:"100vh", background:"#0E1110", color:"#E8EDE9", fontFamily:"-apple-system, BlinkMacSystemFont, sans-serif" }}>
+      <style dangerouslySetInnerHTML={{ __html: `
+        *{box-sizing:border-box;margin:0;padding:0}
+        a{text-decoration:none}
+        input{color:#E8EDE9}
+        input::placeholder{color:#4A6A5A}
+        input:focus{outline:none}
+        .fade-in{animation:fadeIn 0.3s ease}
+        @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+      `}} />
+
+      {/* NAV */}
+      <nav style={{ padding:"0 32px", height:60, borderBottom:"1px solid #1E2820", display:"flex", alignItems:"center", justifyContent:"space-between", position:"sticky", top:0, background:"#0E1110CC", backdropFilter:"blur(12px)", zIndex:100 }}>
+        <a href="https://arcstation.xyz" style={{ display:"flex", alignItems:"center", gap:10 }}>
+          <div style={{ background:"#1A2420", borderRadius:10, padding:4, display:"flex" }}>
+            <img src={LOGO_URL} alt="ArcStation" width={32} height={32} style={{ borderRadius:6, objectFit:"cover", display:"block" }} />
+          </div>
           <div>
-            <h1 className="text-2xl font-bold">FreelancePay</h1>
-            <p className="text-gray-400 text-sm">AI Payment Agent on Arc · Built with Circle USDC</p>
+            <span style={{ fontWeight:700, fontSize:14, color:"#E8EDE9" }}>FreelancePay</span>
+            <span style={{ fontSize:12, color:"#6A8E7A", marginLeft:8, fontFamily:"IBM Plex Mono, monospace" }}>by ArcStation</span>
+          </div>
+        </a>
+        <div style={{ display:"flex", alignItems:"center", gap:16 }}>
+          <div style={{ fontFamily:"IBM Plex Mono, monospace", fontSize:11, color:"#7FB99A", background:"#7FB99A12", border:"1px solid #7FB99A33", padding:"4px 12px", borderRadius:20 }}>
+            Arc Testnet
+          </div>
+          <div style={{ fontFamily:"IBM Plex Mono, monospace", fontSize:11, color:"#A8C4B8" }}>
+            Agent #15994
           </div>
         </div>
+      </nav>
 
-        <div className="grid grid-cols-3 gap-4 mb-8">
-          <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
-            <p className="text-gray-400 text-xs mb-1">Agent ID</p>
-            <p className="text-green-400 font-bold text-lg">15994</p>
-            <p className="text-gray-500 text-xs">ERC-8004 ✓</p>
+      <div style={{ maxWidth:680, margin:"0 auto", padding:"48px 24px" }}>
+
+        {/* HEADER */}
+        <div style={{ marginBottom:32 }}>
+          <div style={{ fontFamily:"IBM Plex Mono, monospace", fontSize:10, color:"#7FB99A", letterSpacing:"0.14em", marginBottom:12 }}>
+            ERC-8183 ESCROW · CIRCLE USDC
           </div>
-          <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
-            <p className="text-gray-400 text-xs mb-1">Reputation</p>
-            <p className="text-blue-400 font-bold text-lg">95/100</p>
-            <p className="text-gray-500 text-xs">On-chain ✓</p>
-          </div>
-          <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
-            <p className="text-gray-400 text-xs mb-1">Network</p>
-            <p className="text-purple-400 font-bold text-lg">Arc</p>
-            <p className="text-gray-500 text-xs">Testnet ✓</p>
-          </div>
+          <h1 style={{ fontSize:28, fontWeight:800, letterSpacing:"-0.8px", color:"#E8EDE9", marginBottom:8 }}>
+            Release Milestone Payment
+          </h1>
+          <p style={{ color:"#7A9E8A", fontSize:14, lineHeight:1.6 }}>
+            Send USDC instantly to any freelancer on Arc Testnet
+          </p>
         </div>
 
-        <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 mb-6">
-          <h2 className="font-semibold mb-5">💰 Release Milestone Payment</h2>
-          <div className="space-y-4">
-            <div>
-              <label className="text-xs text-gray-400 mb-1 block">Freelancer Wallet Address</label>
+        {/* STATS */}
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:10, marginBottom:28 }}>
+          {[
+            ["Agent ID", "15994", "#7FB99A", "ERC-8004 ✓"],
+            ["Reputation", "95/100", "#7FA8C9", "On-chain ✓"],
+            ["Finality", "< 1s", "#C4CFBE", "Arc Testnet"],
+          ].map(([l,v,c,sub]) => (
+            <div key={l} style={{ background:"#111813", border:"1px solid #1E2820", borderRadius:12, padding:"14px 16px" }}>
+              <div style={{ fontFamily:"IBM Plex Mono, monospace", fontSize:10, color:"#6A8E7A", marginBottom:6 }}>{l}</div>
+              <div style={{ fontSize:18, fontWeight:700, color:c, marginBottom:4 }}>{v}</div>
+              <div style={{ fontFamily:"IBM Plex Mono, monospace", fontSize:10, color:"#4A6A5A" }}>{sub}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* FORM */}
+        <div style={{ background:"#111813", border:"1px solid #1E2820", borderRadius:14, padding:24, marginBottom:20 }}>
+          <div style={{ fontFamily:"IBM Plex Mono, monospace", fontSize:10, color:"#7FB99A", letterSpacing:"0.12em", marginBottom:20 }}>
+            // payment details
+          </div>
+
+          {/* Recipient */}
+          <div style={{ marginBottom:18 }}>
+            <label style={{ fontFamily:"IBM Plex Mono, monospace", fontSize:11, color:"#6A8E7A", display:"block", marginBottom:8 }}>
+              FREELANCER WALLET ADDRESS
+            </label>
+            <input
+              value={recipient}
+              onChange={e => setRecipient(e.target.value)}
+              placeholder="0x..."
+              style={{
+                width:"100%", background:"#0E1110", border:`1px solid ${!addrValid ? "#C47A7A" : recipient && addrValid ? "#7FB99A44" : "#1E2820"}`,
+                borderRadius:10, padding:"12px 14px", fontSize:13, fontFamily:"IBM Plex Mono, monospace",
+                color:"#E8EDE9", transition:"border 0.2s"
+              }}
+            />
+            {!addrValid && (
+              <div style={{ fontFamily:"IBM Plex Mono, monospace", fontSize:11, color:"#C47A7A", marginTop:6 }}>
+                ✗ Invalid address format
+              </div>
+            )}
+            {recipient && addrValid && (
+              <div style={{ fontFamily:"IBM Plex Mono, monospace", fontSize:11, color:"#7FB99A", marginTop:6 }}>
+                ✓ Valid address
+              </div>
+            )}
+          </div>
+
+          {/* Amount */}
+          <div style={{ marginBottom:24 }}>
+            <label style={{ fontFamily:"IBM Plex Mono, monospace", fontSize:11, color:"#6A8E7A", display:"block", marginBottom:8 }}>
+              AMOUNT (USDC)
+            </label>
+            <div style={{ display:"flex", gap:8, marginBottom:8 }}>
               <input
-                value={recipient}
-                onChange={(e) => setRecipient(e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-sm font-mono focus:outline-none focus:border-blue-500"
-                placeholder="0x..."
+                value={amount}
+                onChange={e => setAmount(e.target.value)}
+                type="number"
+                step="0.01"
+                min="0.01"
+                placeholder="0.00"
+                style={{
+                  flex:1, background:"#0E1110", border:`1px solid ${!amtValid ? "#C47A7A" : "#1E2820"}`,
+                  borderRadius:10, padding:"12px 14px", fontSize:16, fontWeight:700, color:"#E8EDE9"
+                }}
               />
+              {["1","5","10","50"].map(v => (
+                <button key={v} onClick={() => setAmount(v + ".00")}
+                  style={{ padding:"0 14px", background: amount === v+".00" ? "#7FB99A22" : "#0E1110", border:`1px solid ${amount === v+".00" ? "#7FB99A44" : "#1E2820"}`, borderRadius:10, fontSize:13, color:amount === v+".00" ? "#7FB99A" : "#6A8E7A", cursor:"pointer", fontWeight:600, transition:"all 0.15s" }}>
+                  ${v}
+                </button>
+              ))}
             </div>
-            <div>
-              <label className="text-xs text-gray-400 mb-1 block">Amount (USDC)</label>
-              <div className="flex gap-2">
-                <input
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-blue-500"
-                  placeholder="1.00"
-                  type="number"
-                  step="0.01"
-                />
-                {["1.00","5.00","10.00"].map((v) => (
-                  <button key={v} onClick={() => setAmount(v)}
-                    className="px-3 py-3 bg-gray-800 border border-gray-700 rounded-lg text-sm hover:border-blue-500 transition-colors">
-                    {v}
-                  </button>
-                ))}
+            {amount && amtValid && (
+              <div style={{ fontFamily:"IBM Plex Mono, monospace", fontSize:11, color:"#6A8E7A" }}>
+                {vnd(amount)}
               </div>
-            </div>
-            <button onClick={handlePayout} disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-lg py-3 font-semibold transition-colors flex items-center justify-center gap-2">
-              {loading ? (
-                <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>Processing...</>
-              ) : (<>💸 Release {amount} USDC to Freelancer</>)}
-            </button>
+            )}
+            {!amtValid && amount && (
+              <div style={{ fontFamily:"IBM Plex Mono, monospace", fontSize:11, color:"#C47A7A", marginTop:4 }}>
+                ✗ Amount must be between 0.01 and 10,000
+              </div>
+            )}
           </div>
+
+          {/* Button */}
+          <button
+            onClick={handlePayout}
+            disabled={!canSubmit}
+            style={{
+              width:"100%", padding:"14px", borderRadius:10, border:"none", cursor: canSubmit ? "pointer" : "not-allowed",
+              background: canSubmit ? "linear-gradient(135deg, #7FB99A, #5A9A7A)" : "#1A2420",
+              color: canSubmit ? "#0E1110" : "#4A6A5A", fontSize:14, fontWeight:700,
+              display:"flex", alignItems:"center", justifyContent:"center", gap:8, transition:"all 0.2s"
+            }}>
+            {loading ? (
+              <>
+                <div style={{ width:16, height:16, border:"2px solid #0E1110", borderTopColor:"transparent", borderRadius:"50%", animation:"spin 0.7s linear infinite" }} />
+                Processing...
+              </>
+            ) : (
+              <>&#x24; Release {amount || "0.00"} USDC &#x2192;</>
+            )}
+          </button>
+          <style dangerouslySetInnerHTML={{ __html: `@keyframes spin{to{transform:rotate(360deg)}}` }} />
         </div>
 
+        {/* ERROR */}
         {error && (
-          <div className="bg-red-950 border border-red-800 rounded-xl p-4 mb-4 text-red-400 text-sm">❌ {error}</div>
+          <div className="fade-in" style={{ background:"#2A1010", border:"1px solid #4A2020", borderRadius:12, padding:"14px 16px", marginBottom:16 }}>
+            <div style={{ fontFamily:"IBM Plex Mono, monospace", fontSize:11, color:"#C47A7A" }}>&#x2717; ERROR</div>
+            <div style={{ fontSize:13, color:"#E8A0A0", marginTop:4 }}>{error}</div>
+          </div>
         )}
 
+        {/* SUCCESS */}
         {result && (
-          <div className="bg-green-950 border border-green-800 rounded-xl p-5">
-            <p className="font-semibold text-green-400 mb-3">✅ Payment Successful!</p>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-400">Amount</span>
-                <span>{amount} USDC</span>
+          <div className="fade-in" style={{ background:"#0A1A12", border:"1px solid #7FB99A44", borderRadius:14, padding:20, marginBottom:20 }}>
+            <div style={{ fontFamily:"IBM Plex Mono, monospace", fontSize:10, color:"#7FB99A", letterSpacing:"0.12em", marginBottom:14 }}>
+              &#x2714; PAYMENT CONFIRMED
+            </div>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:14 }}>
+              <div>
+                <div style={{ fontFamily:"IBM Plex Mono, monospace", fontSize:10, color:"#6A8E7A", marginBottom:4 }}>AMOUNT</div>
+                <div style={{ fontSize:20, fontWeight:700, color:"#7FB99A" }}>{result.amount} USDC</div>
+                <div style={{ fontFamily:"IBM Plex Mono, monospace", fontSize:11, color:"#4A6A5A" }}>{vnd(result.amount)}</div>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">State</span>
-                <span className="text-green-400">{result.state}</span>
+              <div>
+                <div style={{ fontFamily:"IBM Plex Mono, monospace", fontSize:10, color:"#6A8E7A", marginBottom:4 }}>RECIPIENT</div>
+                <div style={{ fontFamily:"IBM Plex Mono, monospace", fontSize:13, color:"#E8EDE9" }}>{shortAddr(result.recipient)}</div>
+                <div style={{ fontFamily:"IBM Plex Mono, monospace", fontSize:11, color:"#7FB99A" }}>{result.state}</div>
               </div>
-              <div className="pt-2 border-t border-green-900">
-                <p className="text-gray-400 text-xs mb-1">TX Hash</p>
-                <p className="font-mono text-xs text-blue-400 break-all">{result.txHash}</p>
+            </div>
+            {result.txHash && (
+              <div style={{ background:"#0E1110", borderRadius:8, padding:"10px 12px", marginBottom:10 }}>
+                <div style={{ fontFamily:"IBM Plex Mono, monospace", fontSize:10, color:"#6A8E7A", marginBottom:4 }}>TX HASH</div>
+                <div style={{ fontFamily:"IBM Plex Mono, monospace", fontSize:11, color:"#7FA8C9", wordBreak:"break-all" }}>{result.txHash}</div>
               </div>
-              {result.explorerUrl && (
-                <a href={result.explorerUrl} target="_blank" rel="noopener noreferrer"
-                  className="block text-center bg-green-900 hover:bg-green-800 rounded-lg py-2 text-sm text-green-300 mt-2">
-                  View on ArcScan →
-                </a>
-              )}
+            )}
+            {result.explorerUrl && (
+              <a href={result.explorerUrl} target="_blank" rel="noopener noreferrer"
+                style={{ display:"block", textAlign:"center", background:"#7FB99A18", border:"1px solid #7FB99A33", borderRadius:8, padding:"10px", fontSize:13, color:"#7FB99A", fontWeight:600 }}>
+                View on ArcScan &#x2197;
+              </a>
+            )}
+          </div>
+        )}
+
+        {/* HISTORY */}
+        {history.length > 0 && (
+          <div style={{ background:"#111813", border:"1px solid #1E2820", borderRadius:14, padding:20 }}>
+            <div style={{ fontFamily:"IBM Plex Mono, monospace", fontSize:10, color:"#6A8E7A", letterSpacing:"0.12em", marginBottom:16 }}>
+              // transaction history ({history.length})
+            </div>
+            <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+              {history.map(tx => (
+                <div key={tx.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"10px 12px", background:"#0E1110", borderRadius:8, border:"1px solid #1E2820" }}>
+                  <div>
+                    <div style={{ fontFamily:"IBM Plex Mono, monospace", fontSize:12, color:"#E8EDE9" }}>{shortAddr(tx.recipient)}</div>
+                    <div style={{ fontFamily:"IBM Plex Mono, monospace", fontSize:10, color:"#4A6A5A", marginTop:2 }}>
+                      {tx.timestamp.toLocaleTimeString("vi-VN")}
+                    </div>
+                  </div>
+                  <div style={{ textAlign:"right" }}>
+                    <div style={{ fontSize:14, fontWeight:700, color:"#7FB99A" }}>{tx.amount} USDC</div>
+                    <div style={{ fontFamily:"IBM Plex Mono, monospace", fontSize:10, color:"#7FB99A", marginTop:2 }}>{tx.state}</div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
 
-        <div className="mt-8 text-center text-gray-600 text-xs">
-          Built on Arc Testnet · ERC-8004 Identity · Circle USDC · Agent ID 15994
+        {/* FOOTER */}
+        <div style={{ marginTop:40, textAlign:"center", fontFamily:"IBM Plex Mono, monospace", fontSize:11, color:"#4A6A5A" }}>
+          FreelancePay · ArcStation · Arc Testnet · ERC-8004 · ERC-8183
         </div>
+
       </div>
-    </main>
+    </div>
   );
 }
