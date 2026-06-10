@@ -258,8 +258,13 @@ export default function Home() {
             <h3 style={{ fontSize:20, fontWeight:800, color:"#E8EDE9", marginBottom:6 }}>Send USDC</h3>
             <p style={{ color:"#6A8E7A", fontSize:14, marginBottom:20 }}>From your wallet · No intermediary</p>
             <div style={{ marginBottom:14 }}>
-              <div style={{ ...M, fontSize:12, color:"#6A8E7A", marginBottom:8 }}>RECIPIENT</div>
-              <input value={recipient} onChange={e=>setRecipient(e.target.value)} placeholder="0x..."
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:8 }}>
+              <div style={{ ...M, fontSize:12, color:"#6A8E7A" }}>RECIPIENT</div>
+              <div style={{ ...M, fontSize:11, color:"#4A6A5A" }}>
+                Accepts: <span style={{color:"#7FB99A"}}>0x... address</span> or <span style={{color:"#7FB99A"}}>pay link</span>
+              </div>
+            </div>
+              <input value={recipient} onChange={e=>setRecipient(e.target.value)} placeholder="0x... or earn.arcstation.xyz/pay/username"
                 style={{ width:"100%", background:"#0E1110", border:`1px solid ${recipient&&!addrOk?"#C47A7A55":recipient&&addrOk?"#7FB99A55":"#1E2820"}`, borderRadius:10, padding:"12px 14px", fontSize:13, ...M }}/>
               {recipient && addrOk && (
               <div style={{ ...M, fontSize:12, color:"#7FB99A", marginTop:4 }}>
