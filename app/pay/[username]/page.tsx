@@ -3,13 +3,17 @@ import { useState, useEffect, use } from "react";
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { parseUnits, isAddress } from "viem";
+import { useReadContract } from "wagmi";
 
 const USDC = "0x3600000000000000000000000000000000000000" as const;
 const USDC_ABI = [{ name:"transfer", type:"function", stateMutability:"nonpayable", inputs:[{name:"to",type:"address"},{name:"amount",type:"uint256"}], outputs:[{name:"",type:"bool"}] }] as const;
 
+const REGISTRY = "0xe5f0beff4b982d59b93ee80204888d4a0406eb33" as const;
+const REGISTRY_ABI = [
+  {"name":"getAddress","type":"function","stateMutability":"view","inputs":[{"name":"username","type":"string"}],"outputs":[{"name":"","type":"address"}]},
+] as const;
 const USERNAME_MAP: Record<string, string> = {
   "leo": "0x8b0e1414fb67888c9df36490fbdd342d9dc6c64c",
-  "demo": "0x8b0e1414fb67888c9df36490fbdd342d9dc6c64c",
 };
 
 const shortAddr = (a: string) => a.slice(0,6)+"..."+a.slice(-4);
