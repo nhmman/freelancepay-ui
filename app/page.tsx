@@ -302,13 +302,14 @@ export default function Home() {
           </div>
           <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gridTemplateRows:"repeat(2,1fr)", gap:10 }}>
             {FEATURES.map(f=>(
-              <Link key={f.href} href={f.href} className="fc" style={{ background:"#111813", border:"1px solid #1E2820", borderRadius:14, padding:18, textDecoration:"none", display:"flex", flexDirection:"column" as const }}>
+              <div key={f.href} title="Coming soon" style={{ background:"#0D120F", border:"1px solid #161E18", borderRadius:14, padding:18, display:"flex", flexDirection:"column" as const, opacity:0.6, position:"relative" as const }}>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:12 }}>
-                  <span style={{ fontSize:24 }}>{f.icon}</span>
-                  <span style={{ ...M, fontSize:9, color:"#7FB99A", background:"#7FB99A12", border:"1px solid #7FB99A22", padding:"2px 8px", borderRadius:20 }}>{f.tag}</span>
+                  <span style={{ fontSize:24, filter:"grayscale(0.4)" }}>{f.icon}</span>
+                  <span style={{ ...M, fontSize:9, color:"#C4A23A", background:"#C4A23A12", border:"1px solid #C4A23A33", padding:"2px 8px", borderRadius:20 }}>SOON</span>
                 </div>
-                <div style={{ fontSize:14, fontWeight:700, color:"#E8EDE9", lineHeight:1.4 }}>{f.title}</div>
-              </Link>
+                <div style={{ fontSize:14, fontWeight:700, color:"#A8B5A2", lineHeight:1.4 }}>{f.title}</div>
+                <div style={{ ...M, fontSize:9, color:"#3A5040", marginTop:4 }}>{f.tag}</div>
+              </div>
             ))}
           </div>
         </div>

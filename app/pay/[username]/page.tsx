@@ -2,7 +2,9 @@
 import { useState, useEffect, use } from "react";
 import { useAccount, useWriteContract, useWaitForTransactionReceipt, useReadContract, useChainId, useSwitchChain } from "wagmi";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { QRCodeSVG } from "qrcode.react";
 import { parseUnits, isAddress } from "viem";
+import { buildTransfer, validateMemo, MEMO_ENABLED } from "../../../lib/memo";
 
 const USDC     = "0x3600000000000000000000000000000000000000" as const;
 const REGISTRY = "0xe5f0beff4b982d59b93ee80204888d4a0406eb33" as const;
@@ -26,6 +28,7 @@ export default function PayPage({ params }: { params: Promise<{ username: string
   const [copied, setCopied]   = useState(false);
   const [step, setStep]       = useState<"idle"|"sending"|"success"|"error">("idle");
   const [mounted, setMounted] = useState(false);
+  const [showQR, setShowQR] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
   const { address, isConnected } = useAccount();
@@ -70,7 +73,14 @@ export default function PayPage({ params }: { params: Promise<{ username: string
   useEffect(() => { if(isSuccess) setStep("success"); }, [isSuccess]);
   useEffect(() => { if(writeErr||waitErr) setStep("error"); }, [writeErr, waitErr]);
 
-  const send = () => { if(!recipient||!usdc) return; reset(); writeContract({ address:USDC, abi:USDC_ABI, functionName:"transfer", args:[recipient as `0x${string}`, parseUnits(amount,6)] }); };
+  const send = () => {
+    if(!recipient||!usdc) return;
+    const memoCheck = validateMemo(note);
+    if(!memoCheck.ok){ setStep("error"); return; }
+    reset();
+    const tx = buildTransfer({ to: recipient as `0x${string}`, amountUsdc: amount, memo: note });
+    writeContract(tx as any);
+  };
   const copyLink = () => { navigator.clipboard.writeText(window.location.href); setCopied(true); setTimeout(()=>setCopied(false),2000); };
 
   if (!isAddr && resolving) return (
@@ -139,6 +149,16 @@ export default function PayPage({ params }: { params: Promise<{ username: string
           <button onClick={copyLink} style={{background:"#1E2820",border:"1px solid #2A3830",borderRadius:10,padding:"7px 16px",fontSize:14,color:copied?"#7FB99A":"#A8C4B0",cursor:"pointer",transition:"all 0.2s",...M}}>
             {copied?"✓ Link copied!":"🔗 Copy Pay Link"}
           </button>
+          <button onClick={() => setShowQR(v => !v)} style={{marginLeft:8,background:"#1E2820",border:"1px solid #2A3830",borderRadius:10,padding:"7px 16px",fontSize:14,color:"#A8C4B0",cursor:"pointer",...M}}>
+            {showQR ? "Hide QR" : "📱 QR"}
+          </button>
+          {showQR && (
+            <div style={{marginTop:16,display:"flex",justifyContent:"center"}}>
+              <div style={{background:"#fff",padding:14,borderRadius:16,boxShadow:"0 8px 30px rgba(0,0,0,0.4)"}}>
+                <QRCodeSVG value={`https://earn.arcstation.xyz/pay/${slug}`} size={168} bgColor="#ffffff" fgColor="#0A0F0C" />
+              </div>
+            </div>
+          )}
         </div>
 
         {step==="success" ? (
