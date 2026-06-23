@@ -1,232 +1,322 @@
 "use client";
-import { useState } from "react";
-import Link from "next/link";
+import { useState, useEffect, useCallback } from "react";
+import { useAccount, useReadContract, useChainId, useSwitchChain, useWriteContract, usePublicClient } from "wagmi";
+import { parseUnits } from "viem";
+import { TIMELOCK_ADDRESS, USDC_ADDRESS, TIMELOCK_ABI, USDC_APPROVE_ABI } from "../../lib/timelockEscrow";
+import { ConnectButton } from "@rainbow-me/rainbowkit";
 import Layout from "../components/Layout";
+import { supabase } from "../../lib/supabase";
 
-interface Milestone {
-  id: number;
-  title: string;
-  amount: string;
-  status: "pending" | "released";
-  txHash: string | null;
-}
+const REGISTRY = "0xe5f0beff4b982d59b93ee80204888d4a0406eb33" as const;
+const REGISTRY_ABI = [
+  { name: "getAddress", type: "function", stateMutability: "view",
+    inputs: [{ name: "username", type: "string" }], outputs: [{ name: "", type: "address" }] },
+] as const;
+const ZERO = "0x0000000000000000000000000000000000000000";
+const ARC_ID = 5042002;
+const ARBITER = "0x7ef0bc69160888ffb934619a6d595d0a8c0c9774";
+const M: React.CSSProperties = { fontFamily: "IBM Plex Mono,monospace" };
+const short = (a: string) => a ? a.slice(0, 6) + "..." + a.slice(-4) : "";
 
-interface Project {
+type Agreement = {
   id: string;
-  title: string;
-  freelancerAddress: string;
-  totalAmount: number;
-  milestones: Milestone[];
-}
+  depositor_address: string;
+  beneficiary_username: string;
+  beneficiary_address: string;
+  amount_usdc: number;
+  terms: string;
+  status: string;
+  deliverable_url: string | null;
+  created_at: string;
+};
+
+const STATUS_STYLE: Record<string, { bg: string; color: string; label: string }> = {
+  DRAFT:     { bg: "#1A1810", color: "#C4A23A", label: "Draft · not funded" },
+  FUNDED:    { bg: "#0A1420", color: "#7FA8C9", label: "Funded · in progress" },
+  SUBMITTED: { bg: "#1A1410", color: "#D8A878", label: "Work submitted" },
+  RELEASED:  { bg: "#0A1A10", color: "#7FB99A", label: "Released ✓" },
+  REFUNDED:  { bg: "#1A0E0E", color: "#C47A7A", label: "Refunded" },
+};
 
 export default function MilestonesPage() {
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [showForm, setShowForm] = useState(false);
-  const [loading, setLoading] = useState<string | null>(null);
-  const [title, setTitle] = useState("");
-  const [freelancerAddress, setFreelancerAddress] = useState("0x8b0e1414fb67888c9df36490fbdd342d9dc6c64c");
-  const [milestones, setMilestones] = useState([
-    { title: "Design mockup", amount: "1.00" },
-    { title: "Development", amount: "2.00" },
-    { title: "Deployment", amount: "1.00" },
-  ]);
+  const { address, isConnected } = useAccount();
+  const chainId = useChainId();
+  const { switchChain } = useSwitchChain();
+  const onArc = chainId === ARC_ID;
+  const [mounted, setMounted] = useState(false);
 
-  const addMilestone = () => setMilestones([...milestones, { title: "", amount: "1.00" }]);
+  const [bUsername, setBUsername] = useState("");
+  const [amount, setAmount] = useState("");
+  const [terms, setTerms] = useState("");
+  const [creating, setCreating] = useState(false);
 
-  const updateMilestone = (i: number, field: string, value: string) => {
-    const updated = [...milestones];
-    updated[i] = { ...updated[i], [field]: value };
-    setMilestones(updated);
+  const [agreements, setAgreements] = useState<Agreement[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => { setMounted(true); }, []);
+
+  const slug = bUsername.trim().toLowerCase();
+  const { data: resolved } = useReadContract({
+    address: REGISTRY, abi: REGISTRY_ABI, functionName: "getAddress",
+    args: slug.length >= 2 ? [slug] : undefined,
+    query: { enabled: slug.length >= 2 },
+  });
+  const beneficiaryAddress = resolved && resolved !== ZERO ? (resolved as string) : null;
+
+  const me = address?.toLowerCase() ?? "";
+
+  const load = useCallback(async () => {
+    if (!me) return;
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("escrow_agreements")
+      .select("*")
+      .or(`depositor_address.eq.${me},beneficiary_address.eq.${me}`)
+      .order("created_at", { ascending: false });
+    if (!error) setAgreements((data as Agreement[]) || []);
+    setLoading(false);
+  }, [me]);
+
+  useEffect(() => { if (me) load(); }, [me, load]);
+
+  const createEscrow = async () => {
+    if (!me || !beneficiaryAddress || !amount || !terms.trim()) return;
+    setCreating(true);
+    await supabase.from("escrow_agreements").insert({
+      depositor_address: me,
+      beneficiary_username: slug,
+      beneficiary_address: beneficiaryAddress.toLowerCase(),
+      amount_usdc: parseFloat(amount),
+      terms: terms.trim(),
+      status: "DRAFT",
+    });
+    setBUsername(""); setAmount(""); setTerms("");
+    setCreating(false);
+    load();
   };
 
-  const createProject = async () => {
-    setLoading("creating");
+  const setStatus = async (id: string, status: string, extra: Record<string, unknown> = {}) => {
+    await supabase.from("escrow_agreements")
+      .update({ status, updated_at: new Date().toISOString(), ...extra })
+      .eq("id", id);
+    load();
+  };
+
+  const pc = usePublicClient();
+  const { writeContractAsync } = useWriteContract();
+  const [fundingId, setFundingId] = useState<string | null>(null);
+  const [fundStep, setFundStep] = useState("");
+
+  const TIMELOCK_SECONDS = 7 * 24 * 60 * 60; // 7-day dispute window before auto-release
+
+  const fundEscrow = async (a: Agreement) => {
+    if (!pc || !address) return;
     try {
-      const res = await fetch("/api/milestones", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, freelancerAddress, milestones }),
+      setFundingId(a.id);
+      const amt = parseUnits(String(a.amount_usdc), 6);
+      setFundStep("Approving USDC...");
+      const approveHash = await writeContractAsync({
+        address: USDC_ADDRESS, abi: USDC_APPROVE_ABI, functionName: "approve",
+        args: [TIMELOCK_ADDRESS, amt],
       });
-      const data = await res.json();
-      if (data.success) {
-        setProjects([...projects, data.data]);
-        setShowForm(false);
-        setTitle("");
-      }
+      await pc.waitForTransactionReceipt({ hash: approveHash });
+
+      setFundStep("Locking funds...");
+      const idBefore = await pc.readContract({ address: TIMELOCK_ADDRESS, abi: TIMELOCK_ABI, functionName: "nonce" }) as bigint;
+      const fundHash = await writeContractAsync({
+        address: TIMELOCK_ADDRESS, abi: TIMELOCK_ABI, functionName: "fund",
+        args: [a.beneficiary_address as `0x${string}`, amt, BigInt(TIMELOCK_SECONDS)],
+      });
+      await pc.waitForTransactionReceipt({ hash: fundHash });
+      const paymentId = Number(idBefore);
+
+      await supabase.from("escrow_agreements").update({
+        status: "FUNDED", payment_id: paymentId, tx_hash_fund: fundHash, updated_at: new Date().toISOString(),
+      }).eq("id", a.id);
+      load();
+    } catch (e: any) {
+      alert("Funding failed or rejected: " + (e?.shortMessage || e?.message || "unknown"));
     } finally {
-      setLoading(null);
+      setFundingId(null); setFundStep("");
     }
   };
 
-  const releaseMilestone = async (projectId: string, milestoneId: number, amount: string, address: string) => {
-    setLoading(projectId + "-" + milestoneId);
+  const [actingId, setActingId] = useState<string | null>(null);
+  const [actStep, setActStep] = useState("");
+  const isArbiter = me === ARBITER;
+
+  const releasePayment = async (a: Agreement) => {
+    if (!pc || a.payment_id === null || a.payment_id === undefined) return;
     try {
-      const res = await fetch("/api/milestones/release", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount, recipientAddress: address }),
+      setActingId(a.id); setActStep("Releasing...");
+      const hash = await writeContractAsync({
+        address: TIMELOCK_ADDRESS, abi: TIMELOCK_ABI, functionName: "release",
+        args: [BigInt(a.payment_id)],
       });
-      const data = await res.json();
-      if (data.success) {
-        setProjects(projects.map((p) =>
-          p.id !== projectId ? p : {
-            ...p,
-            milestones: p.milestones.map((m) =>
-              m.id !== milestoneId ? m : { ...m, status: "released" as const, txHash: data.data.txHash }
-            ),
-          }
-        ));
-      }
-    } finally {
-      setLoading(null);
-    }
+      await pc.waitForTransactionReceipt({ hash });
+      await supabase.from("escrow_agreements").update({ status: "RELEASED", tx_hash_release: hash, updated_at: new Date().toISOString() }).eq("id", a.id);
+      load();
+    } catch (e: any) { alert("Release failed: " + (e?.shortMessage || e?.message || "")); }
+    finally { setActingId(null); setActStep(""); }
   };
 
-  const totalReleased = (p: Project) =>
-    p.milestones.filter((m) => m.status === "released").reduce((s, m) => s + parseFloat(m.amount), 0);
+  const refundEscrow = async (a: Agreement) => {
+    if (!pc || a.payment_id === null || a.payment_id === undefined) return;
+    try {
+      setActingId(a.id); setActStep("Refunding...");
+      const hash = await writeContractAsync({
+        address: TIMELOCK_ADDRESS, abi: TIMELOCK_ABI, functionName: "refund",
+        args: [BigInt(a.payment_id)],
+      });
+      await pc.waitForTransactionReceipt({ hash });
+      await supabase.from("escrow_agreements").update({ status: "REFUNDED", tx_hash_release: hash, updated_at: new Date().toISOString() }).eq("id", a.id);
+      load();
+    } catch (e: any) { alert("Refund failed: " + (e?.shortMessage || e?.message || "")); }
+    finally { setActingId(null); setActStep(""); }
+  };
+
+  const isDepositor = (a: Agreement) => a.depositor_address === me;
+  const isBeneficiary = (a: Agreement) => a.beneficiary_address === me;
+
+  const canCreate = !!beneficiaryAddress && !!amount && parseFloat(amount) > 0 && terms.trim().length > 0;
 
   return (
     <Layout>
-    <div className="min-h-screen p-8">
-      <div className="max-w-3xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-3">
-            <Link href="/" className="text-gray-400 hover:text-white text-sm">Back</Link>
-            <div>
-              <h1 className="text-2xl font-bold">Multi-Milestone Escrow</h1>
-              <p className="text-gray-400 text-sm">Project-based USDC payments on Arc</p>
-            </div>
-          </div>
-          <button onClick={() => setShowForm(!showForm)}
-            className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg text-sm font-medium">
-            + New Project
-          </button>
-        </div>
+      <style dangerouslySetInnerHTML={{ __html: `
+        input,textarea{color:#E8EDE9!important;background:#0E1110;border:1px solid #1E2820;border-radius:10px;padding:12px 14px;width:100%;font-size:14px}
+        input:focus,textarea:focus{outline:none;border-color:#7FB99A55}
+        textarea{font-family:inherit;resize:vertical;min-height:80px}
+      ` }} />
+      <div style={{ maxWidth: 820, margin: "0 auto", padding: "40px 24px", color: "#E8EDE9" }}>
+        <div style={{ ...M, fontSize: 13, color: "#7FB99A", marginBottom: 8 }}>// milestone escrow · on-chain</div>
+        <h1 style={{ fontSize: 30, fontWeight: 900, letterSpacing: "-1px", marginBottom: 6 }}>Escrow Agreements</h1>
+        <p style={{ color: "#7A9E8A", fontSize: 15, marginBottom: 28 }}>
+          Lock USDC for a job. Release when work is delivered, refund if not.
+        </p>
 
-        {showForm && (
-          <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 mb-6">
-            <h2 className="font-semibold mb-4">Create New Project</h2>
-            <div className="space-y-4">
-              <div>
-                <label className="text-xs text-gray-400 mb-1 block">Project Title</label>
-                <input value={title} onChange={(e) => setTitle(e.target.value)}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-blue-500"
-                  placeholder="e.g. Build landing page" />
-              </div>
-              <div>
-                <label className="text-xs text-gray-400 mb-1 block">Freelancer Wallet</label>
-                <input value={freelancerAddress} onChange={(e) => setFreelancerAddress(e.target.value)}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-sm font-mono focus:outline-none focus:border-blue-500" />
-              </div>
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs text-gray-400">Milestones</label>
-                  <button onClick={addMilestone} className="text-xs text-blue-400 hover:text-blue-300">+ Add</button>
-                </div>
-                <div className="space-y-2">
-                  {milestones.map((m, i) => (
-                    <div key={i} className="flex gap-2">
-                      <input value={m.title} onChange={(e) => updateMilestone(i, "title", e.target.value)}
-                        className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
-                        placeholder="Milestone title" />
-                      <input value={m.amount} onChange={(e) => updateMilestone(i, "amount", e.target.value)}
-                        className="w-24 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
-                        type="number" step="0.01" />
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="flex justify-between items-center pt-2">
-                <span className="text-sm text-gray-400">
-                  Total: <span className="text-white font-medium">
-                    {milestones.reduce((s, m) => s + parseFloat(m.amount || "0"), 0).toFixed(2)} USDC
-                  </span>
-                </span>
-                <button onClick={createProject} disabled={loading === "creating" || !title}
-                  className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 px-6 py-2 rounded-lg text-sm font-medium">
-                  {loading === "creating" ? "Creating..." : "Create Project"}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {projects.length === 0 && !showForm ? (
-          <div className="text-center py-16 text-gray-600">
-            <p className="text-4xl mb-3">📋</p>
-            <p>No projects yet. Click New Project to get started.</p>
+        {!mounted || !isConnected ? (
+          <div style={{ background: "#0A1208", border: "1px solid #7FB99A33", borderRadius: 18, padding: "32px 20px", textAlign: "center" }}>
+            <div style={{ fontSize: 32, marginBottom: 10 }}>🔒</div>
+            <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 6 }}>Connect wallet to manage escrows</div>
+            <div style={{ display: "flex", justifyContent: "center", marginTop: 14 }}><ConnectButton label="Connect Wallet" /></div>
           </div>
         ) : (
-          <div className="space-y-4">
-            {projects.map((project) => (
-              <div key={project.id} className="bg-gray-900 rounded-xl p-6 border border-gray-800">
-                <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <h3 className="font-semibold text-lg">{project.title}</h3>
-                    <p className="text-gray-500 text-xs font-mono mt-1">
-                      {project.freelancerAddress.slice(0, 10)}...{project.freelancerAddress.slice(-8)}
-                    </p>
+          <>
+            <div style={{ background: "#111813", border: "1px solid #1E2820", borderRadius: 20, padding: 28, marginBottom: 28 }}>
+              <div style={{ ...M, fontSize: 13, color: "#7FB99A", marginBottom: 16 }}>// new escrow</div>
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ ...M, fontSize: 12, color: "#7A9E8A", marginBottom: 8 }}>BENEFICIARY (pay link username)</div>
+                <input value={bUsername} onChange={e => setBUsername(e.target.value)} placeholder="e.g. leo" />
+                {slug.length >= 2 && (
+                  <div style={{ ...M, fontSize: 12, marginTop: 6, color: beneficiaryAddress ? "#7FB99A" : "#C47A7A" }}>
+                    {beneficiaryAddress ? `✓ ${short(beneficiaryAddress)}` : "✗ Username not found on-chain"}
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm text-gray-400">
-                      <span className="text-green-400 font-bold">{totalReleased(project).toFixed(2)}</span>
-                      /{project.totalAmount.toFixed(2)} USDC
-                    </p>
-                    <p className="text-xs text-gray-600 mt-1">
-                      {project.milestones.filter((m) => m.status === "released").length}/
-                      {project.milestones.length} done
-                    </p>
-                  </div>
+                )}
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 14, marginBottom: 14 }}>
+                <div>
+                  <div style={{ ...M, fontSize: 12, color: "#7A9E8A", marginBottom: 8 }}>AMOUNT (USDC)</div>
+                  <input type="number" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} placeholder="100" />
                 </div>
-
-                <div className="w-full bg-gray-800 rounded-full h-1.5 mb-4">
-                  <div className="bg-green-500 h-1.5 rounded-full transition-all"
-                    style={{ width: (totalReleased(project) / project.totalAmount * 100) + "%" }} />
-                </div>
-
-                <div className="space-y-2">
-                  {project.milestones.map((milestone) => (
-                    <div key={milestone.id}
-                      className={"flex items-center justify-between p-3 rounded-lg border " +
-                        (milestone.status === "released"
-                          ? "bg-green-950 border-green-900"
-                          : "bg-gray-800 border-gray-700")}>
-                      <div className="flex items-center gap-3">
-                        <span>{milestone.status === "released" ? "✅" : "⏳"}</span>
-                        <div>
-                          <p className="text-sm font-medium">{milestone.title}</p>
-                          {milestone.txHash && (
-                            <a href={"https://testnet.arcscan.app/tx/" + milestone.txHash}
-                              target="_blank" rel="noopener noreferrer"
-                              className="text-xs text-blue-400 hover:text-blue-300">
-                              {milestone.txHash.slice(0, 16)}... view
-                            </a>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm font-medium text-yellow-400">{milestone.amount} USDC</span>
-                        {milestone.status === "pending" && (
-                          <button
-                            onClick={() => releaseMilestone(project.id, milestone.id, milestone.amount, project.freelancerAddress)}
-                            disabled={loading === project.id + "-" + milestone.id}
-                            className="bg-green-700 hover:bg-green-600 disabled:bg-gray-700 px-3 py-1.5 rounded-lg text-xs font-medium">
-                            {loading === project.id + "-" + milestone.id ? "..." : "Release"}
-                          </button>
-                        )}
-                        {milestone.status === "released" && (
-                          <span className="text-xs text-green-400">Paid ✓</span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                <div>
+                  <div style={{ ...M, fontSize: 12, color: "#7A9E8A", marginBottom: 8 }}>TERMS / ACCEPTANCE CRITERIA</div>
+                  <input value={terms} onChange={e => setTerms(e.target.value)} placeholder="e.g. Deliver 3 logo concepts in PNG" />
                 </div>
               </div>
-            ))}
-          </div>
+              <button onClick={createEscrow} disabled={!canCreate || creating}
+                style={{ width: "100%", padding: 14, borderRadius: 12, border: "none", fontSize: 15, fontWeight: 800,
+                  background: canCreate && !creating ? "linear-gradient(135deg,#7FB99A,#5A9A7A)" : "#1A2420",
+                  color: canCreate && !creating ? "#0A0F0C" : "#4A6A5A",
+                  cursor: canCreate && !creating ? "pointer" : "not-allowed" }}>
+                {creating ? "Creating..." : "Create Escrow Agreement"}
+              </button>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+              <div style={{ ...M, fontSize: 12, color: "#6A8E7A" }}>{agreements.length} AGREEMENT{agreements.length !== 1 ? "S" : ""}</div>
+              <button onClick={load} disabled={loading} style={{ ...M, fontSize: 12, color: "#7FB99A", background: "#7FB99A12", border: "1px solid #7FB99A33", borderRadius: 8, padding: "5px 12px", cursor: "pointer" }}>
+                {loading ? "..." : "↻ Refresh"}
+              </button>
+            </div>
+
+            {agreements.length === 0 ? (
+              <div style={{ background: "#0E1110", border: "1px solid #1E2820", borderRadius: 14, padding: "40px 20px", textAlign: "center" }}>
+                <div style={{ fontSize: 28, marginBottom: 10 }}>📋</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "#A8B5A2" }}>No escrows yet</div>
+                <div style={{ ...M, fontSize: 12, color: "#6A8E7A", marginTop: 6 }}>Create one above to get started</div>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {agreements.map(a => {
+                  const st = STATUS_STYLE[a.status] ?? STATUS_STYLE.DRAFT;
+                  const dep = isDepositor(a);
+                  const ben = isBeneficiary(a);
+                  return (
+                    <div key={a.id} style={{ background: "#111813", border: "1px solid #1E2820", borderRadius: 16, padding: 20 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                        <div>
+                          <div style={{ fontSize: 18, fontWeight: 800 }}>${a.amount_usdc} USDC</div>
+                          <div style={{ ...M, fontSize: 12, color: "#6A8E7A", marginTop: 2 }}>
+                            {dep ? `to @${a.beneficiary_username}` : `from ${short(a.depositor_address)}`} · {dep ? "you pay" : "you receive"}
+                          </div>
+                        </div>
+                        <span style={{ ...M, fontSize: 11, color: st.color, background: st.bg, border: `1px solid ${st.color}33`, padding: "4px 12px", borderRadius: 20 }}>
+                          {st.label}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 14, color: "#A8B5A2", lineHeight: 1.5, marginBottom: 14, paddingBottom: 14, borderBottom: "1px solid #161E18" }}>
+                        {a.terms}
+                      </div>
+
+                      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                        {dep && a.status === "DRAFT" && (
+                          <button onClick={() => fundEscrow(a)} disabled={fundingId === a.id} style={btnPrimary}>{fundingId === a.id ? fundStep || "Processing..." : "Fund Escrow →"}</button>
+                        )}
+                        {ben && a.status === "FUNDED" && (
+                          <button onClick={() => {
+                            const url = prompt("Link to your deliverable (image/file URL):");
+                            if (url) setStatus(a.id, "SUBMITTED", { deliverable_url: url });
+                          }} style={btnGhost}>Submit Work</button>
+                        )}
+                        {a.deliverable_url && (a.status === "SUBMITTED" || a.status === "RELEASED") && (
+                          <a href={a.deliverable_url} target="_blank" rel="noopener noreferrer" style={{ ...btnGhost, textDecoration: "none" }}>View deliverable ↗</a>
+                        )}
+                        {dep && a.status === "SUBMITTED" && a.payment_id !== null && (
+                          <button onClick={() => releasePayment(a)} disabled={actingId === a.id} style={btnPrimary}>
+                            {actingId === a.id ? actStep || "Processing..." : "Approve & Release"}
+                          </button>
+                        )}
+
+                        {isArbiter && a.payment_id !== null && (a.status === "FUNDED" || a.status === "SUBMITTED") && (
+                          <button onClick={() => refundEscrow(a)} disabled={actingId === a.id} style={btnDanger}>{actingId === a.id ? actStep || "Processing..." : "Refund to depositor"}</button>
+                        )}
+                        {(a.status === "RELEASED" || a.status === "REFUNDED") && (
+                          <span style={{ ...M, fontSize: 12, color: "#4A6A5A" }}>
+                            {a.status === "RELEASED" ? "✓ Paid out" : "Refunded"}
+                            {a.tx_hash_release ? <> · <a href={`https://testnet.arcscan.app/tx/${a.tx_hash_release}`} target="_blank" rel="noopener noreferrer" style={{ color: "#7FA8C9" }}>tx ↗</a></> : null}
+                          </span>
+                        )}
+                      </div>
+
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {mounted && isConnected && !onArc && (
+              <div style={{ ...M, fontSize: 12, color: "#C4A23A", marginTop: 16, textAlign: "center" }}>
+                ⚠️ Switch to Arc Testnet for on-chain actions ·{" "}
+                <button onClick={() => switchChain({ chainId: ARC_ID })} style={{ color: "#C4A23A", background: "none", border: "none", textDecoration: "underline", cursor: "pointer" }}>Switch</button>
+              </div>
+            )}
+          </>
         )}
       </div>
-    </div>
     </Layout>
   );
 }
+
+const btnPrimary: React.CSSProperties = { padding: "10px 18px", borderRadius: 10, border: "none", background: "linear-gradient(135deg,#7FB99A,#5A9A7A)", color: "#0A0F0C", fontSize: 14, fontWeight: 700, cursor: "pointer" };
+const btnGhost: React.CSSProperties = { padding: "10px 18px", borderRadius: 10, border: "1px solid #2A3830", background: "transparent", color: "#A8C4B0", fontSize: 14, fontWeight: 700, cursor: "pointer" };
+const btnDanger: React.CSSProperties = { padding: "10px 18px", borderRadius: 10, border: "1px solid #3A2020", background: "transparent", color: "#C47A7A", fontSize: 14, fontWeight: 700, cursor: "pointer" };
