@@ -26,7 +26,10 @@ type Agreement = {
   amount_usdc: number;
   terms: string;
   status: string;
+  payment_id: number | null;
   deliverable_url: string | null;
+  tx_hash_fund: string | null;
+  tx_hash_release: string | null;
   created_at: string;
 };
 
