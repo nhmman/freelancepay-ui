@@ -294,7 +294,7 @@ export default function MilestonesPage() {
                           <button onClick={() => refundEscrow(a)} disabled={actingId === a.id} style={btnDanger}>{actingId === a.id ? actStep || "Processing..." : "Refund to depositor"}</button>
                         )}
                         {(a.status === "RELEASED" || a.status === "REFUNDED") && (
-                          <span style={{ ...M, fontSize: 15, fontWeight: 600, color: "#3B5878", , fontWeight: 500 }}>
+                          <span style={{ ...M, fontSize: 15, fontWeight: 600, color: "#3B5878" }}>
                             {a.status === "RELEASED" ? "✓ Paid out" : "Refunded"}
                             {a.tx_hash_release ? <> · <a href={`https://testnet.arcscan.app/tx/${a.tx_hash_release}`} target="_blank" rel="noopener noreferrer" style={{ color: "#7FA8C9" }}>tx ↗</a></> : null}
                           </span>
@@ -321,5 +321,5 @@ export default function MilestonesPage() {
 }
 
 const btnPrimary: React.CSSProperties = { padding: "10px 18px", borderRadius: 10, border: "none", background: "linear-gradient(135deg,#2775CA,#1855A0)", color: "#0A1628", fontSize: 15, fontWeight: 700, cursor: "pointer" };
-const btnGhost: React.CSSProperties = { padding: "10px 18px", borderRadius: 10, border: "1px solid #2A3830", background: "transparent", color: "#3B5878", fontWeight: 600, fontSize: 15, fontWeight: 700, cursor: "pointer" };
+const btnGhost: React.CSSProperties = { padding: "10px 18px", borderRadius: 10, border: "1px solid #2A3830", background: "transparent", color: "#3B5878", fontWeight: 700, fontSize: 15, cursor: "pointer" };
 const btnDanger: React.CSSProperties = { padding: "10px 18px", borderRadius: 10, border: "1px solid #FECACA", background: "transparent", color: "#DC2626", fontSize: 15, fontWeight: 700, cursor: "pointer" };
