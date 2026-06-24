@@ -143,7 +143,7 @@ export default function HistoryPage() {
             ) : txs.length === 0 ? (
               <div style={{ background: "#F4F7FD", border: "1px solid #E2EAF8", borderRadius: 14, padding: "40px 20px", textAlign: "center" }}>
                 <div style={{ fontSize: 28, marginBottom: 10 }}>&#127793;</div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: "#3B5878", fontWeight: 600, marginBottom: 6 }}>No USDC transactions yet</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "#3B5878", marginBottom: 6 }}>No USDC transactions yet</div>
                 <div style={{ ...M, fontSize: 15, fontWeight: 600, color: "#3B5878" }}>Send or receive USDC to see it here</div>
               </div>
             ) : (
