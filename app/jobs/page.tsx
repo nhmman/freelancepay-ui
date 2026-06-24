@@ -19,8 +19,7 @@ const STATUS_COLORS: Record<JobStatus, string> = {
   Open: "text-yellow-400 bg-yellow-400/10 border-yellow-400/20",
   Funded: "text-blue-400 bg-blue-400/10 border-blue-400/20",
   Submitted: "text-purple-400 bg-purple-400/10 border-purple-400/20",
-  Completed: "text-green-400 bg-green-400/10 border-green-400/20",
-};
+  Completed: "text-green-400 bg-green-400/10 border-green-400/20" };
 
 const STATUS_STEPS: JobStatus[] = ["Open", "Funded", "Submitted", "Completed"];
 
@@ -41,8 +40,7 @@ export default function JobsPage() {
       const res = await fetch("/api/jobs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ description, budget }),
-      });
+        body: JSON.stringify({ description, budget }) });
       const data = await res.json();
       if (data.success) {
         setJobs((prev) => [data.job, ...prev]);
@@ -63,8 +61,7 @@ export default function JobsPage() {
       const res = await fetch("/api/jobs/fund", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jobId: job.jobId, budget: job.budget }),
-      });
+        body: JSON.stringify({ jobId: job.jobId, budget: job.budget }) });
       const data = await res.json();
       if (data.success) {
         setJobs((prev) => prev.map((j) => j.id === job.id
@@ -84,8 +81,7 @@ export default function JobsPage() {
       const res = await fetch("/api/jobs/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jobId: job.jobId }),
-      });
+        body: JSON.stringify({ jobId: job.jobId }) });
       const data = await res.json();
       if (data.success) {
         setJobs((prev) => prev.map((j) => j.id === job.id
@@ -105,8 +101,7 @@ export default function JobsPage() {
       const res = await fetch("/api/jobs/complete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jobId: job.jobId }),
-      });
+        body: JSON.stringify({ jobId: job.jobId }) });
       const data = await res.json();
       if (data.success) {
         setJobs((prev) => prev.map((j) => j.id === job.id

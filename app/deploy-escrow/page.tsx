@@ -24,8 +24,7 @@ export default function DeployEscrow() {
     deployContract({
       abi: REFUND_ABI as any,
       bytecode: REFUND_BYTECODE,
-      args: [address as `0x${string}`, USDC as `0x${string}`, "ArcStation Escrow", "1.0"],
-    });
+      args: [address as `0x${string}`, USDC as `0x${string}`, "ArcStation Escrow", "1.0"] });
   };
 
   const deployed = receipt?.contractAddress;

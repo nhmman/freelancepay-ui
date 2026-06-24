@@ -23,8 +23,7 @@ const TYPE_CONFIG: Record<string, { color: string; icon: string; bg: string }> =
   received: { color: "text-green-400", icon: "↓", bg: "bg-green-500/10 border-green-500/20" },
   swap: { color: "text-blue-400", icon: "⇄", bg: "bg-blue-500/10 border-blue-500/20" },
   bridge: { color: "text-purple-400", icon: "⇒", bg: "bg-purple-500/10 border-purple-500/20" },
-  sent: { color: "text-yellow-400", icon: "↑", bg: "bg-yellow-500/10 border-yellow-500/20" },
-};
+  sent: { color: "text-yellow-400", icon: "↑", bg: "bg-yellow-500/10 border-yellow-500/20" } };
 
 export default function DashboardPage() {
   const [payments, setPayments] = useState<Payment[]>([]);

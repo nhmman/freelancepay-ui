@@ -24,8 +24,7 @@ export default function NanopayPage() {
   const [inputs, setInputs] = useState<Record<string, string>>({
     translate: "Xin chao, toi la freelancer Viet Nam",
     analyze: "Sales: Jan 100, Feb 120, Mar 95, Apr 140",
-    review: "function add(a, b) { return a + b; }",
-  });
+    review: "function add(a, b) { return a + b; }" });
   const [totalSpent, setTotalSpent] = useState(0);
 
   const callService = async (serviceId: string, price: string, serviceName: string) => {
@@ -34,8 +33,7 @@ export default function NanopayPage() {
       const res = await fetch("/api/nanopay", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ serviceId, input: inputs[serviceId], amount: price }),
-      });
+        body: JSON.stringify({ serviceId, input: inputs[serviceId], amount: price }) });
       const data = await res.json();
       if (data.success) {
         setTransactions((prev) => [{
@@ -44,8 +42,7 @@ export default function NanopayPage() {
           amount: price,
           txHash: data.txHash,
           timestamp: new Date().toLocaleTimeString(),
-          result: data.result,
-        }, ...prev]);
+          result: data.result }, ...prev]);
         setTotalSpent((prev) => prev + parseFloat(price));
       } else {
         alert("Error: " + data.error);

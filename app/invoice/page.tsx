@@ -36,8 +36,7 @@ export default function InvoicePage() {
       const res = await fetch("/api/invoice", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt }),
-      });
+        body: JSON.stringify({ prompt }) });
       const data = await res.json();
       if (data.success) {
         setPreview(data.invoice);
@@ -53,8 +52,7 @@ export default function InvoicePage() {
       const res = await fetch("/api/invoice/pay", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ invoiceId: invoice.id, amount: invoice.total }),
-      });
+        body: JSON.stringify({ invoiceId: invoice.id, amount: invoice.total }) });
       const data = await res.json();
       if (data.success) {
         const paid = { ...invoice, status: "paid" as const, txHash: data.txHash };

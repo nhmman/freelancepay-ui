@@ -62,8 +62,7 @@ export default function HistoryPage() {
             direction: isOut ? "out" : "in",
             counterparty: isOut ? (it?.to?.hash ?? "") : (it?.from?.hash ?? ""),
             amount: (Number(raw) / 10 ** decimals).toLocaleString("en-US", { maximumFractionDigits: 2 }),
-            time: it?.timestamp ?? "",
-          } as Tx;
+            time: it?.timestamp ?? "" } as Tx;
         });
 
       const native: Tx[] = (txData?.items ?? [])
@@ -76,8 +75,7 @@ export default function HistoryPage() {
             direction: isOut ? "out" : "in",
             counterparty: isOut ? (it?.to?.hash ?? "") : (it?.from?.hash ?? ""),
             amount: (Number(raw) / 1e18).toLocaleString("en-US", { maximumFractionDigits: 2 }),
-            time: it?.timestamp ?? "",
-          } as Tx;
+            time: it?.timestamp ?? "" } as Tx;
         });
 
       const byHash = new Map<string, Tx>();
@@ -117,18 +115,18 @@ export default function HistoryPage() {
           <>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 24 }}>
               <div style={{ background: "#FFFFFF", border: "1px solid #E2EAF8", borderRadius: 16, padding: "18px 20px" }}>
-                <div style={{ ...M, fontSize: 15, fontWeight: 600, fontWeight: 600, color: "#3B5878", fontWeight: 600, marginBottom: 6 }}>RECEIVED &#8595;</div>
+                <div style={{ ...M, fontSize: 15, fontWeight: 600, color: "#3B5878", marginBottom: 6 }}>RECEIVED &#8595;</div>
                 <div style={{ fontSize: 26, fontWeight: 900, color: "#1A7A4A" }}>${totalIn.toLocaleString("en-US", { maximumFractionDigits: 2 })}</div>
               </div>
               <div style={{ background: "#FFFBEB", border: "1px solid #2A2018", borderRadius: 16, padding: "18px 20px" }}>
-                <div style={{ ...M, fontSize: 15, fontWeight: 600, fontWeight: 600, color: "#A08868", marginBottom: 6 }}>SENT &#8593;</div>
+                <div style={{ ...M, fontSize: 15, fontWeight: 600, color: "#A08868", marginBottom: 6 }}>SENT &#8593;</div>
                 <div style={{ fontSize: 26, fontWeight: 900, color: "#F59E0B" }}>${totalOut.toLocaleString("en-US", { maximumFractionDigits: 2 })}</div>
               </div>
             </div>
 
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-              <div style={{ ...M, fontSize: 15, fontWeight: 600, fontWeight: 600, color: "#3B5878", fontWeight: 600 }}>{txs.length} TRANSACTION{txs.length !== 1 ? "S" : ""}</div>
-              <button onClick={load} disabled={loading} style={{ ...M, fontSize: 15, fontWeight: 600, fontWeight: 600, color: "#2775CA", background: "#EBF2FD", border: "1px solid #2775CA33", borderRadius: 8, padding: "5px 12px", cursor: "pointer" }}>
+              <div style={{ ...M, fontSize: 15, fontWeight: 600, color: "#3B5878" }}>{txs.length} TRANSACTION{txs.length !== 1 ? "S" : ""}</div>
+              <button onClick={load} disabled={loading} style={{ ...M, fontSize: 15, fontWeight: 600, color: "#2775CA", background: "#EBF2FD", border: "1px solid #2775CA33", borderRadius: 8, padding: "5px 12px", cursor: "pointer" }}>
                 {loading ? "Loading..." : "\u21bb Refresh"}
               </button>
             </div>
@@ -146,7 +144,7 @@ export default function HistoryPage() {
               <div style={{ background: "#F4F7FD", border: "1px solid #E2EAF8", borderRadius: 14, padding: "40px 20px", textAlign: "center" }}>
                 <div style={{ fontSize: 28, marginBottom: 10 }}>&#127793;</div>
                 <div style={{ fontSize: 15, fontWeight: 700, color: "#3B5878", fontWeight: 600, marginBottom: 6 }}>No USDC transactions yet</div>
-                <div style={{ ...M, fontSize: 15, fontWeight: 600, fontWeight: 600, color: "#3B5878", fontWeight: 600 }}>Send or receive USDC to see it here</div>
+                <div style={{ ...M, fontSize: 15, fontWeight: 600, color: "#3B5878" }}>Send or receive USDC to see it here</div>
               </div>
             ) : (
               <div style={{ background: "#F4F7FD", border: "1px solid #E2EAF8", borderRadius: 16, overflow: "hidden" }}>
@@ -161,7 +159,7 @@ export default function HistoryPage() {
                       <div style={{ fontSize: 15, fontWeight: 700, color: "#0A1628" }}>
                         {t.direction === "in" ? "Received" : "Sent"}
                       </div>
-                      <div style={{ ...M, fontSize: 15, fontWeight: 600, fontWeight: 600, color: "#3B5878", fontWeight: 600 }}>
+                      <div style={{ ...M, fontSize: 15, fontWeight: 600, color: "#3B5878" }}>
                         {t.direction === "in" ? "from " : "to "}{short(t.counterparty)} · {timeAgo(t.time)}
                       </div>
                     </div>
@@ -169,14 +167,14 @@ export default function HistoryPage() {
                       <div style={{ fontSize: 16, fontWeight: 800, color: t.direction === "in" ? "#1A7A4A" : "#2775CA" }}>
                         {t.direction === "in" ? "+" : "\u2212"}${t.amount}
                       </div>
-                      <div style={{ ...M, fontSize: 15, fontWeight: 600, fontWeight: 600, color: "#3B5878", fontWeight: 600, fontWeight: 500 }}>USDC ↗</div>
+                      <div style={{ ...M, fontSize: 15, fontWeight: 600, color: "#3B5878" }}>USDC ↗</div>
                     </div>
                   </a>
                 ))}
               </div>
             )}
 
-            <div style={{ ...M, fontSize: 15, fontWeight: 600, fontWeight: 600, color: "#3B5878", fontWeight: 600, fontWeight: 500, textAlign: "center", marginTop: 20 }}>
+            <div style={{ ...M, fontSize: 15, fontWeight: 600, color: "#3B5878", textAlign: "center", marginTop: 20 }}>
               Data from Arc Testnet via Blockscout · arcstation.xyz
             </div>
           </>

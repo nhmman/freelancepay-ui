@@ -56,8 +56,7 @@ export default function Home() {
     abi: REGISTRY_ABI,
     functionName: "getUsername",
     args: address ? [address] : undefined,
-    query: { enabled: !!address, refetchInterval: 3000 },
-  });
+    query: { enabled: !!address, refetchInterval: 3000 } });
 
   // Check if username is available
   const { data: isAvailable } = useReadContract({
@@ -65,8 +64,7 @@ export default function Home() {
     abi: REGISTRY_ABI,
     functionName: "isAvailable",
     args: inputUsername.trim() ? [inputUsername.trim().toLowerCase()] : undefined,
-    query: { enabled: !!inputUsername.trim() && claimValid },
-  });
+    query: { enabled: !!inputUsername.trim() && claimValid } });
 
   // Claim username
   const { writeContract: claimUsername, data: claimHash, isPending: claiming } = useWriteContract();
@@ -104,8 +102,7 @@ export default function Home() {
     abi: REGISTRY_ABI,
     functionName: "getAddress",
     args: recipientSlug ? [recipientSlug] : undefined,
-    query: { enabled: !!recipientSlug },
-  });
+    query: { enabled: !!recipientSlug } });
 
   const resolvedAddr = isAddress(recipient)
     ? recipient
@@ -198,8 +195,7 @@ export default function Home() {
                       color: (claimValid && isAvailable === true && onArc && !claiming)
                         ? "#0A1628" : "#9BB5C8",
                       cursor: (claimValid && isAvailable === true && onArc && !claiming)
-                        ? "pointer" : "not-allowed",
-                    }}>
+                        ? "pointer" : "not-allowed" }}>
                       {claiming ? "Confirming..." : onChainUsername ? "Change Username" : "Claim"}
                     </button>
                     {onChainUsername && (

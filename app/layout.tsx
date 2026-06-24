@@ -5,8 +5,7 @@ import Web3Provider from "./components/Web3Provider";
 export const metadata: Metadata = {
   title: "FreelancePay — AI Payment Agent on Arc",
   description: "Trustless USDC escrow for global freelancers.",
-  icons: { icon: "/favicon.png", apple: "/favicon.png" },
-};
+  icons: { icon: "/favicon.png", apple: "/favicon.png" } };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

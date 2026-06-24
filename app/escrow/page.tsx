@@ -38,8 +38,7 @@ const STATUS_STYLE: Record<string, { bg: string; color: string; label: string }>
   FUNDED:    { bg: "#EBF2FD", color: "#7FA8C9", label: "Funded · in progress" },
   SUBMITTED: { bg: "#FFFBEB", color: "#F59E0B", label: "Work submitted" },
   RELEASED:  { bg: "#FFFFFF", color: "#2775CA", label: "Released ✓" },
-  REFUNDED:  { bg: "#FFF5F5", color: "#DC2626", label: "Refunded" },
-};
+  REFUNDED:  { bg: "#FFF5F5", color: "#DC2626", label: "Refunded" } };
 
 export default function MilestonesPage() {
   const { address, isConnected } = useAccount();
@@ -62,8 +61,7 @@ export default function MilestonesPage() {
   const { data: resolved } = useReadContract({
     address: REGISTRY, abi: REGISTRY_ABI, functionName: "getAddress",
     args: slug.length >= 2 ? [slug] : undefined,
-    query: { enabled: slug.length >= 2 },
-  });
+    query: { enabled: slug.length >= 2 } });
   const beneficiaryAddress = resolved && resolved !== ZERO ? (resolved as string) : null;
 
   const me = address?.toLowerCase() ?? "";
@@ -91,8 +89,7 @@ export default function MilestonesPage() {
       beneficiary_address: beneficiaryAddress.toLowerCase(),
       amount_usdc: parseFloat(amount),
       terms: terms.trim(),
-      status: "DRAFT",
-    });
+      status: "DRAFT" });
     setBUsername(""); setAmount(""); setTerms("");
     setCreating(false);
     load();
@@ -120,22 +117,19 @@ export default function MilestonesPage() {
       setFundStep("Approving USDC...");
       const approveHash = await writeContractAsync({
         address: USDC_ADDRESS, abi: USDC_APPROVE_ABI, functionName: "approve",
-        args: [TIMELOCK_ADDRESS, amt],
-      });
+        args: [TIMELOCK_ADDRESS, amt] });
       await pc.waitForTransactionReceipt({ hash: approveHash });
 
       setFundStep("Locking funds...");
       const idBefore = await pc.readContract({ address: TIMELOCK_ADDRESS, abi: TIMELOCK_ABI, functionName: "nonce" }) as bigint;
       const fundHash = await writeContractAsync({
         address: TIMELOCK_ADDRESS, abi: TIMELOCK_ABI, functionName: "fund",
-        args: [a.beneficiary_address as `0x${string}`, amt, BigInt(TIMELOCK_SECONDS)],
-      });
+        args: [a.beneficiary_address as `0x${string}`, amt, BigInt(TIMELOCK_SECONDS)] });
       await pc.waitForTransactionReceipt({ hash: fundHash });
       const paymentId = Number(idBefore);
 
       await supabase.from("escrow_agreements").update({
-        status: "FUNDED", payment_id: paymentId, tx_hash_fund: fundHash, updated_at: new Date().toISOString(),
-      }).eq("id", a.id);
+        status: "FUNDED", payment_id: paymentId, tx_hash_fund: fundHash, updated_at: new Date().toISOString() }).eq("id", a.id);
       load();
     } catch (e: any) {
       alert("Funding failed or rejected: " + (e?.shortMessage || e?.message || "unknown"));
@@ -154,8 +148,7 @@ export default function MilestonesPage() {
       setActingId(a.id); setActStep("Releasing...");
       const hash = await writeContractAsync({
         address: TIMELOCK_ADDRESS, abi: TIMELOCK_ABI, functionName: "release",
-        args: [BigInt(a.payment_id)],
-      });
+        args: [BigInt(a.payment_id)] });
       await pc.waitForTransactionReceipt({ hash });
       await supabase.from("escrow_agreements").update({ status: "RELEASED", tx_hash_release: hash, updated_at: new Date().toISOString() }).eq("id", a.id);
       load();
@@ -169,8 +162,7 @@ export default function MilestonesPage() {
       setActingId(a.id); setActStep("Refunding...");
       const hash = await writeContractAsync({
         address: TIMELOCK_ADDRESS, abi: TIMELOCK_ABI, functionName: "refund",
-        args: [BigInt(a.payment_id)],
-      });
+        args: [BigInt(a.payment_id)] });
       await pc.waitForTransactionReceipt({ hash });
       await supabase.from("escrow_agreements").update({ status: "REFUNDED", tx_hash_release: hash, updated_at: new Date().toISOString() }).eq("id", a.id);
       load();
@@ -236,7 +228,7 @@ export default function MilestonesPage() {
             </div>
 
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-              <div style={{ ...M, fontSize: 15, fontWeight: 600, color: "#3B5878",  }}>{agreements.length} AGREEMENT{agreements.length !== 1 ? "S" : ""}</div>
+              <div style={{ ...M, fontSize: 15, fontWeight: 600, color: "#3B5878" }}>{agreements.length} AGREEMENT{agreements.length !== 1 ? "S" : ""}</div>
               <button onClick={load} disabled={loading} style={{ ...M, fontSize: 15, fontWeight: 600, color: "#2775CA", background: "#EBF2FD", border: "1px solid #2775CA33", borderRadius: 8, padding: "5px 12px", cursor: "pointer" }}>
                 {loading ? "..." : "↻ Refresh"}
               </button>

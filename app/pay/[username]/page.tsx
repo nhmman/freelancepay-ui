@@ -43,8 +43,7 @@ export default function PayPage({ params }: { params: Promise<{ username: string
   const { data: balanceRaw } = useReadContract({
     address: USDC, abi: ERC20_ABI, functionName: "balanceOf",
     args: address ? [address] : undefined,
-    query: { enabled: !!address, refetchInterval: 5000 },
-  });
+    query: { enabled: !!address, refetchInterval: 5000 } });
   const balance = balanceRaw ? Number(balanceRaw) / 1e6 : 0;
   const insufficient = usdc > 0 && balance > 0 && usdc > balance;
 
@@ -52,14 +51,12 @@ export default function PayPage({ params }: { params: Promise<{ username: string
   const { data: senderUsername } = useReadContract({
     address: REGISTRY, abi: REGISTRY_ABI, functionName: "getUsername",
     args: address ? [address] : undefined,
-    query: { enabled: !!address },
-  });
+    query: { enabled: !!address } });
 
   const { data: chainAddr, isLoading: resolving } = useReadContract({
     address: REGISTRY, abi: REGISTRY_ABI, functionName: "getAddress",
     args: !isAddr ? [slug] : undefined,
-    query: { enabled: !isAddr },
-  });
+    query: { enabled: !isAddr } });
 
   const recipient = isAddr ? slug
     : chainAddr && chainAddr !== "0x0000000000000000000000000000000000000000"

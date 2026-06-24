@@ -46,8 +46,7 @@ export default function PortfolioPage() {
       const res = await fetch("/api/portfolio/swap", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: swapAmount, tokenIn: swapFrom, tokenOut: swapTo }),
-      });
+        body: JSON.stringify({ amount: swapAmount, tokenIn: swapFrom, tokenOut: swapTo }) });
       const data = await res.json();
       if (data.success) {
         setSwapResult(data);

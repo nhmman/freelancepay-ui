@@ -24,8 +24,7 @@ export default function DeployTimelock() {
     deployContract({
       abi: TIMELOCK_ABI as any,
       bytecode: TIMELOCK_BYTECODE,
-      args: [address as `0x${string}`, USDC as `0x${string}`],
-    });
+      args: [address as `0x${string}`, USDC as `0x${string}`] });
   };
 
   const deployed = receipt?.contractAddress;

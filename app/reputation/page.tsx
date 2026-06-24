@@ -47,8 +47,7 @@ export default function ReputationPage() {
       const res = await fetch("/api/reputation/pay", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ agentId, reputation, baseAmount: amount, adjustedAmount }),
-      });
+        body: JSON.stringify({ agentId, reputation, baseAmount: amount, adjustedAmount }) });
       const data = await res.json();
       if (data.success) setPayResult(data);
       else alert("Error: " + data.error);
