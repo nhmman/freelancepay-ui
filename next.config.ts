@@ -9,6 +9,8 @@ const nextConfig: NextConfig = {
         destination: "/",
         permanent: false,
       },
+      // /pay → /send (avoid conflict with /pay/[username])
+      { source: "/pay", destination: "/send", permanent: false },
       // /milestones → /escrow (backward compat)
       {
         source: "/milestones",

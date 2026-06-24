@@ -6,7 +6,7 @@ import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useAccount } from "wagmi";
 
 const NAV_ITEMS = [
-  { href: "/pay",     label: "Pay" },
+  { href: "/send",     label: "Pay" },
   { href: "/payroll", label: "Payroll" },
   { href: "/escrow",  label: "Escrow" },
   { href: "/tip",     label: "Tip" },
