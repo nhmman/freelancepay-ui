@@ -236,7 +236,7 @@ export default function MilestonesPage() {
             </div>
 
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-              <div style={{ ...M, fontSize: 15, fontWeight: 600, color: "#3B5878", fontWeight: 600 }}>{agreements.length} AGREEMENT{agreements.length !== 1 ? "S" : ""}</div>
+              <div style={{ ...M, fontSize: 15, fontWeight: 600, color: "#3B5878",  }}>{agreements.length} AGREEMENT{agreements.length !== 1 ? "S" : ""}</div>
               <button onClick={load} disabled={loading} style={{ ...M, fontSize: 15, fontWeight: 600, color: "#2775CA", background: "#EBF2FD", border: "1px solid #2775CA33", borderRadius: 8, padding: "5px 12px", cursor: "pointer" }}>
                 {loading ? "..." : "↻ Refresh"}
               </button>
@@ -246,7 +246,7 @@ export default function MilestonesPage() {
               <div style={{ background: "#F4F7FD", border: "1px solid #E2EAF8", borderRadius: 14, padding: "40px 20px", textAlign: "center" }}>
                 <div style={{ fontSize: 28, marginBottom: 10 }}>📋</div>
                 <div style={{ fontSize: 15, fontWeight: 700, color: "#3B5878", fontWeight: 600 }}>No escrows yet</div>
-                <div style={{ ...M, fontSize: 15, fontWeight: 600, color: "#3B5878", fontWeight: 600, marginTop: 6 }}>Create one above to get started</div>
+                <div style={{ ...M, fontSize: 15, fontWeight: 600, color: "#3B5878", , marginTop: 6 }}>Create one above to get started</div>
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -259,7 +259,7 @@ export default function MilestonesPage() {
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
                         <div>
                           <div style={{ fontSize: 18, fontWeight: 800 }}>${a.amount_usdc} USDC</div>
-                          <div style={{ ...M, fontSize: 15, fontWeight: 600, color: "#3B5878", fontWeight: 600, marginTop: 2 }}>
+                          <div style={{ ...M, fontSize: 15, fontWeight: 600, color: "#3B5878", , marginTop: 2 }}>
                             {dep ? `to @${a.beneficiary_username}` : `from ${short(a.depositor_address)}`} · {dep ? "you pay" : "you receive"}
                           </div>
                         </div>
@@ -294,7 +294,7 @@ export default function MilestonesPage() {
                           <button onClick={() => refundEscrow(a)} disabled={actingId === a.id} style={btnDanger}>{actingId === a.id ? actStep || "Processing..." : "Refund to depositor"}</button>
                         )}
                         {(a.status === "RELEASED" || a.status === "REFUNDED") && (
-                          <span style={{ ...M, fontSize: 15, fontWeight: 600, color: "#3B5878", fontWeight: 600, fontWeight: 500 }}>
+                          <span style={{ ...M, fontSize: 15, fontWeight: 600, color: "#3B5878", , fontWeight: 500 }}>
                             {a.status === "RELEASED" ? "✓ Paid out" : "Refunded"}
                             {a.tx_hash_release ? <> · <a href={`https://testnet.arcscan.app/tx/${a.tx_hash_release}`} target="_blank" rel="noopener noreferrer" style={{ color: "#7FA8C9" }}>tx ↗</a></> : null}
                           </span>
