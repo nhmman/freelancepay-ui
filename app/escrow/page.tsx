@@ -208,21 +208,21 @@ export default function MilestonesPage() {
             <div style={{ background: "#FFFFFF", border: "1px solid #E2EAF8", borderRadius: 20, padding: 28, marginBottom: 28 }}>
               <div style={{ ...M, fontSize: 15, color: "#2775CA", marginBottom: 16 }}>// new escrow</div>
               <div style={{ marginBottom: 14 }}>
-                <div style={{ ...M, fontSize: 15, fontWeight: 600, fontWeight: 600, color: "#3B5878", fontWeight: 600, marginBottom: 8 }}>BENEFICIARY (pay link username)</div>
+                <div style={{ ...M, fontSize: 15, fontWeight: 600, color: "#3B5878", fontWeight: 600, marginBottom: 8 }}>BENEFICIARY (pay link username)</div>
                 <input value={bUsername} onChange={e => setBUsername(e.target.value)} placeholder="e.g. leo" />
                 {slug.length >= 2 && (
-                  <div style={{ ...M, fontSize: 15, fontWeight: 600, fontWeight: 600, marginTop: 6, color: beneficiaryAddress ? "#2775CA" : "#DC2626" }}>
+                  <div style={{ ...M, fontSize: 15, fontWeight: 600, marginTop: 6, color: beneficiaryAddress ? "#2775CA" : "#DC2626" }}>
                     {beneficiaryAddress ? `✓ ${short(beneficiaryAddress)}` : "✗ Username not found on-chain"}
                   </div>
                 )}
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 14, marginBottom: 14 }}>
                 <div>
-                  <div style={{ ...M, fontSize: 15, fontWeight: 600, fontWeight: 600, color: "#3B5878", fontWeight: 600, marginBottom: 8 }}>AMOUNT (USDC)</div>
+                  <div style={{ ...M, fontSize: 15, fontWeight: 600, color: "#3B5878", fontWeight: 600, marginBottom: 8 }}>AMOUNT (USDC)</div>
                   <input type="number" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} placeholder="100" />
                 </div>
                 <div>
-                  <div style={{ ...M, fontSize: 15, fontWeight: 600, fontWeight: 600, color: "#3B5878", fontWeight: 600, marginBottom: 8 }}>TERMS / ACCEPTANCE CRITERIA</div>
+                  <div style={{ ...M, fontSize: 15, fontWeight: 600, color: "#3B5878", fontWeight: 600, marginBottom: 8 }}>TERMS / ACCEPTANCE CRITERIA</div>
                   <input value={terms} onChange={e => setTerms(e.target.value)} placeholder="e.g. Deliver 3 logo concepts in PNG" />
                 </div>
               </div>
@@ -236,8 +236,8 @@ export default function MilestonesPage() {
             </div>
 
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-              <div style={{ ...M, fontSize: 15, fontWeight: 600, fontWeight: 600, color: "#3B5878", fontWeight: 600 }}>{agreements.length} AGREEMENT{agreements.length !== 1 ? "S" : ""}</div>
-              <button onClick={load} disabled={loading} style={{ ...M, fontSize: 15, fontWeight: 600, fontWeight: 600, color: "#2775CA", background: "#EBF2FD", border: "1px solid #2775CA33", borderRadius: 8, padding: "5px 12px", cursor: "pointer" }}>
+              <div style={{ ...M, fontSize: 15, fontWeight: 600, color: "#3B5878", fontWeight: 600 }}>{agreements.length} AGREEMENT{agreements.length !== 1 ? "S" : ""}</div>
+              <button onClick={load} disabled={loading} style={{ ...M, fontSize: 15, fontWeight: 600, color: "#2775CA", background: "#EBF2FD", border: "1px solid #2775CA33", borderRadius: 8, padding: "5px 12px", cursor: "pointer" }}>
                 {loading ? "..." : "↻ Refresh"}
               </button>
             </div>
@@ -246,7 +246,7 @@ export default function MilestonesPage() {
               <div style={{ background: "#F4F7FD", border: "1px solid #E2EAF8", borderRadius: 14, padding: "40px 20px", textAlign: "center" }}>
                 <div style={{ fontSize: 28, marginBottom: 10 }}>📋</div>
                 <div style={{ fontSize: 15, fontWeight: 700, color: "#3B5878", fontWeight: 600 }}>No escrows yet</div>
-                <div style={{ ...M, fontSize: 15, fontWeight: 600, fontWeight: 600, color: "#3B5878", fontWeight: 600, marginTop: 6 }}>Create one above to get started</div>
+                <div style={{ ...M, fontSize: 15, fontWeight: 600, color: "#3B5878", fontWeight: 600, marginTop: 6 }}>Create one above to get started</div>
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -259,11 +259,11 @@ export default function MilestonesPage() {
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
                         <div>
                           <div style={{ fontSize: 18, fontWeight: 800 }}>${a.amount_usdc} USDC</div>
-                          <div style={{ ...M, fontSize: 15, fontWeight: 600, fontWeight: 600, color: "#3B5878", fontWeight: 600, marginTop: 2 }}>
+                          <div style={{ ...M, fontSize: 15, fontWeight: 600, color: "#3B5878", fontWeight: 600, marginTop: 2 }}>
                             {dep ? `to @${a.beneficiary_username}` : `from ${short(a.depositor_address)}`} · {dep ? "you pay" : "you receive"}
                           </div>
                         </div>
-                        <span style={{ ...M, fontSize: 15, fontWeight: 600, fontWeight: 600, color: st.color, background: st.bg, border: `1px solid ${st.color}33`, padding: "4px 12px", borderRadius: 20 }}>
+                        <span style={{ ...M, fontSize: 15, fontWeight: 600, color: st.color, background: st.bg, border: `1px solid ${st.color}33`, padding: "4px 12px", borderRadius: 20 }}>
                           {st.label}
                         </span>
                       </div>
@@ -294,7 +294,7 @@ export default function MilestonesPage() {
                           <button onClick={() => refundEscrow(a)} disabled={actingId === a.id} style={btnDanger}>{actingId === a.id ? actStep || "Processing..." : "Refund to depositor"}</button>
                         )}
                         {(a.status === "RELEASED" || a.status === "REFUNDED") && (
-                          <span style={{ ...M, fontSize: 15, fontWeight: 600, fontWeight: 600, color: "#3B5878", fontWeight: 600, fontWeight: 500 }}>
+                          <span style={{ ...M, fontSize: 15, fontWeight: 600, color: "#3B5878", fontWeight: 600, fontWeight: 500 }}>
                             {a.status === "RELEASED" ? "✓ Paid out" : "Refunded"}
                             {a.tx_hash_release ? <> · <a href={`https://testnet.arcscan.app/tx/${a.tx_hash_release}`} target="_blank" rel="noopener noreferrer" style={{ color: "#7FA8C9" }}>tx ↗</a></> : null}
                           </span>
@@ -308,7 +308,7 @@ export default function MilestonesPage() {
             )}
 
             {mounted && isConnected && !onArc && (
-              <div style={{ ...M, fontSize: 15, fontWeight: 600, fontWeight: 600, color: "#D97706", marginTop: 16, textAlign: "center" }}>
+              <div style={{ ...M, fontSize: 15, fontWeight: 600, color: "#D97706", marginTop: 16, textAlign: "center" }}>
                 ⚠️ Switch to Arc Testnet for on-chain actions ·{" "}
                 <button onClick={() => switchChain({ chainId: ARC_ID })} style={{ color: "#D97706", background: "none", border: "none", textDecoration: "underline", cursor: "pointer" }}>Switch</button>
               </div>
