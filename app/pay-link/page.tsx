@@ -9,7 +9,7 @@ import Link from "next/link";
 const USDC     = "0x3600000000000000000000000000000000000000" as const;
 const REGISTRY = "0xe5f0beff4b982d59b93ee80204888d4a0406eb33" as const;
 const ARC_ID   = 5042002;
-const BASE     = "https://earn.arcstation.xyz/pay/";
+const BASE     = "https://arcstation.xyz/pay/";
 const short    = (a:string) => a.slice(0,6)+"..."+a.slice(-4);
 const M: React.CSSProperties = { fontFamily:"IBM Plex Mono,monospace" };
 
@@ -169,7 +169,7 @@ export default function Home() {
                 <div style={{ background:"#F4F7FD", border:"1px solid #2775CA44", borderRadius:14, padding:"16px 20px", marginBottom:16 }}>
                   <div style={{ ...M, fontSize:11, color:"#9BB5C8", marginBottom:8 }}>YOUR LINK · ON-CHAIN ✓</div>
                   <div style={{ fontSize:18, fontWeight:800, color:"#0A1628" }}>
-                    earn.arcstation.xyz/pay/<span style={{ color:"#2775CA" }}>
+                    arcstation.xyz/pay/<span style={{ color:"#2775CA" }}>
                       {onChainUsername ? (onChainUsername as string) : short(address!)}
                     </span>
                   </div>
@@ -262,7 +262,7 @@ export default function Home() {
                   Your Pay Link
                 </div>
                 <div style={{ fontFamily:"IBM Plex Mono,monospace", fontSize:12, color:"rgba(255,255,255,0.7)", marginTop:1 }}>
-                  earn.arcstation.xyz/pay/{onChainUsername as string}
+                  arcstation.xyz/pay/{onChainUsername as string}
                 </div>
               </div>
             </div>
@@ -286,7 +286,7 @@ export default function Home() {
                 Accepts: <span style={{color:"#2775CA"}}>0x... address</span> or <span style={{color:"#2775CA"}}>pay link</span>
               </div>
             </div>
-              <input value={recipient} onChange={e=>setRecipient(e.target.value)} placeholder="0x... or earn.arcstation.xyz/pay/username"
+              <input value={recipient} onChange={e=>setRecipient(e.target.value)} placeholder="0x... or arcstation.xyz/pay/username"
                 style={{ width:"100%", background:"#F4F7FD", border:`1px solid ${recipient&&!addrOk?"#DC262655":recipient&&addrOk?"#2775CA55":"#E2EAF8"}`, borderRadius:10, padding:"12px 14px", fontSize:13, ...M }}/>
               {recipient && addrOk && (
               <div style={{ ...M, fontSize:12, color:"#2775CA", marginTop:4 }}>

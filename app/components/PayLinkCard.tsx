@@ -3,7 +3,7 @@ import { useAccount } from "wagmi";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useState } from "react";
 
-const BASE = "https://earn.arcstation.xyz/pay/";
+const BASE = "https://arcstation.xyz/pay/";
 const shortAddr = (a: string) => a.slice(0,6)+"..."+a.slice(-4);
 
 export default function PayLinkCard() {
@@ -19,7 +19,7 @@ export default function PayLinkCard() {
         {isConnected && link ? (
           <>
             <div style={{ fontSize:16, fontWeight:800, color:"#E8EDE9", marginBottom:6 }}>
-              earn.arcstation.xyz/pay/<span style={{ color:"#7FB99A" }}>{shortAddr(address!)}</span>
+              arcstation.xyz/pay/<span style={{ color:"#7FB99A" }}>{shortAddr(address!)}</span>
             </div>
             <div style={{ fontSize:13, color:"#6A8E7A" }}>Share this link — anyone can pay you in USDC instantly. No sign-up. No fees.</div>
           </>

@@ -156,7 +156,7 @@ export default function PayPage({ params }: { params: Promise<{ username: string
           {showQR && (
             <div style={{marginTop:16,display:"flex",justifyContent:"center"}}>
               <div style={{background:"#fff",padding:14,borderRadius:16,boxShadow:"0 8px 20px rgba(39,117,202,0.12)"}}>
-                <QRCodeSVG value={`https://earn.arcstation.xyz/pay/${slug}`} size={168} bgColor="#FFFFFF" fgColor="#0A1628" />
+                <QRCodeSVG value={`https://arcstation.xyz/pay/${slug}`} size={168} bgColor="#FFFFFF" fgColor="#0A1628" />
               </div>
             </div>
           )}
@@ -289,7 +289,7 @@ export default function PayPage({ params }: { params: Promise<{ username: string
       </div>
 
       <a href="/" style={{marginTop:18,...M,fontSize:13,color:"#6B8DB8",textDecoration:"none"}}>
-        Get your own Pay Link at earn.arcstation.xyz →
+        Get your own Pay Link at arcstation.xyz →
       </a>
     </div>
   );
