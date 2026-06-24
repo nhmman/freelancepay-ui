@@ -2,6 +2,7 @@
 import { useState, useEffect, use } from "react";
 import { useAccount, useWriteContract, useWaitForTransactionReceipt, useReadContract, useChainId, useSwitchChain } from "wagmi";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
+import Image from "next/image";
 import { QRCodeSVG } from "qrcode.react";
 import { parseUnits, isAddress } from "viem";
 import { buildTransfer, validateMemo, MEMO_ENABLED } from "../../../lib/memo";
@@ -94,7 +95,7 @@ export default function PayPage({ params }: { params: Promise<{ username: string
   );
 
   if (!recipient) return (
-    <div style={{minHeight:"100vh",background:"#0A1628",display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
+    <div style={{minHeight:"100vh",background:"#F4F7FD",display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
       <div style={{textAlign:"center",color:"#0A1628",maxWidth:380}}>
         <div style={{fontSize:52,marginBottom:16}}>🔍</div>
         <div style={{fontSize:24,fontWeight:800,marginBottom:10}}>@{slug} not found</div>
@@ -119,12 +120,15 @@ export default function PayPage({ params }: { params: Promise<{ username: string
         .ab:hover{border-color:#2775CA66!important;background:#2775CA22!important}
       `}}/>
 
-      <div style={{width:"100%",maxWidth:460,background:"#FFFFFF",border:"1px solid #E2EAF8",borderRadius:28,overflow:"hidden",boxShadow:"0 40px 100px rgba(0,0,0,0.6)"}}>
+      <div style={{width:"100%",maxWidth:460,background:"#FFFFFF",border:"1px solid #E2EAF8",borderRadius:28,overflow:"hidden",boxShadow:"0 20px 60px rgba(39,117,202,0.15)"}}>
 
         {/* HEADER */}
-        <div style={{background:"linear-gradient(135deg,#1A2820,#131F18)",padding:"32px 28px 24px",textAlign:"center",borderBottom:"1px solid #E2EAF8",position:"relative"}}>
+        <div style={{background:"linear-gradient(135deg,#2775CA,#1855A0)",padding:"32px 28px 24px",textAlign:"center",borderBottom:"1px solid #E2EAF8",position:"relative"}}>
           {/* ArcStation badge */}
-          <div style={{position:"absolute",top:14,left:14,...M,fontSize:13,color:"#2775CA",background:"#EBF2FD",border:"1px solid #2775CA33",padding:"4px 12px",borderRadius:20}}>ArcStation</div>
+          <a href="/" style={{position:"absolute",top:14,left:14,display:"flex",alignItems:"center",gap:6,textDecoration:"none",...M,fontSize:13,color:"#FFFFFF",background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.3)",padding:"4px 12px",borderRadius:20}}>
+            <Image src="/arcstation-logo.svg" alt="ArcStation" width={16} height={16} style={{filter:"brightness(0) invert(1)"}}/>
+            ArcStation
+          </a>
 
           {/* Wallet status top-right */}
           {mounted && (
@@ -143,13 +147,13 @@ export default function PayPage({ params }: { params: Promise<{ username: string
               {displayName.charAt(0)}
             </div>
           </div>
-          <div style={{fontSize:24,fontWeight:900,marginBottom:4,letterSpacing:"-0.5px"}}>{displayName}</div>
-          <div style={{...M,fontSize:12,color:"#6B8DB8",marginBottom:4}}>{short(recipient)}</div>
-          <div style={{...M,fontSize:13,color:"#6B8DB8",marginBottom:14}}>Arc Testnet · Circle USDC</div>
-          <button onClick={copyLink} style={{background:"#E2EAF8",border:"1px solid #2A3830",borderRadius:10,padding:"7px 16px",fontSize:14,color:copied?"#2775CA":"#6B8DB8",cursor:"pointer",transition:"all 0.2s",...M}}>
+          <div style={{fontSize:24,fontWeight:900,marginBottom:4,letterSpacing:"-0.5px",color:"#FFFFFF"}}>{displayName}</div>
+          <div style={{...M,fontSize:12,color:"rgba(255,255,255,0.7)",marginBottom:4}}>{short(recipient)}</div>
+          <div style={{...M,fontSize:13,color:"rgba(255,255,255,0.7)",marginBottom:14}}>Arc Testnet · Circle USDC</div>
+          <button onClick={copyLink} style={{background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.3)",borderRadius:10,padding:"7px 16px",fontSize:14,color:copied?"#FFFFFF":"rgba(255,255,255,0.8)",cursor:"pointer",transition:"all 0.2s",...M}}>
             {copied?"✓ Link copied!":"🔗 Copy Pay Link"}
           </button>
-          <button onClick={() => setShowQR(v => !v)} style={{marginLeft:8,background:"#E2EAF8",border:"1px solid #2A3830",borderRadius:10,padding:"7px 16px",fontSize:14,color:"#6B8DB8",cursor:"pointer",...M}}>
+          <button onClick={() => setShowQR(v => !v)} style={{marginLeft:8,background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.3)",borderRadius:10,padding:"7px 16px",fontSize:14,color:"#6B8DB8",cursor:"pointer",...M}}>
             {showQR ? "Hide QR" : "📱 QR"}
           </button>
           {showQR && (
@@ -195,10 +199,10 @@ export default function PayPage({ params }: { params: Promise<{ username: string
 
             {/* Wrong chain */}
             {mounted&&isConnected&&!onArc&&(
-              <div style={{background:"#1A1500",border:"1px solid #D9770655",borderRadius:14,padding:"14px 18px",marginBottom:20,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <div style={{background:"#FFFBEB",border:"1.5px solid #FDE68A",borderRadius:14,padding:"14px 18px",marginBottom:20,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
                 <div>
                   <div style={{...M,fontSize:14,color:"#D97706",fontWeight:700,marginBottom:2}}>⚠️ Wrong network</div>
-                  <div style={{...M,fontSize:13,color:"#A08030"}}>Switch to Arc Testnet to send USDC</div>
+                  <div style={{...M,fontSize:13,color:"#92400E"}}>Switch to Arc Testnet to send USDC</div>
                 </div>
                 <button onClick={()=>switchChain({chainId:ARC_ID})}
                   style={{...M,fontSize:14,color:"#D97706",background:"#D9770622",border:"1px solid #D9770655",borderRadius:10,padding:"8px 16px",cursor:"pointer",fontWeight:700}}>
@@ -238,7 +242,7 @@ export default function PayPage({ params }: { params: Promise<{ username: string
                 </div>
                 {balance > 0 && !insufficient && (
                   <button onClick={()=>setAmount(balance.toFixed(2))}
-                    style={{...M,fontSize:13,color:"#2775CA",background:"#EBF2FD",border:"1px solid #2775CA33",borderRadius:8,padding:"3px 10px",cursor:"pointer"}}>
+                    style={{...M,fontSize:13,color:"#FFFFFF",background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.3)",borderRadius:8,padding:"3px 10px",cursor:"pointer"}}>
                     Max
                   </button>
                 )}

@@ -26,8 +26,8 @@ export const USDC_ABI = [
 ] as const;
 
 // ── Memo contract (FILL IN AFTER 2026-06-18) ──
-export const MEMO_ENABLED = false;
-export const MEMO_ADDRESS: Address = "0x0000000000000000000000000000000000000000";
+export const MEMO_ENABLED = true;
+export const MEMO_ADDRESS: Address = "0x5294E9927c3306DcBaDb03fe70b92e01cCede505";
 
 export const MEMO_ABI = [
   { name: "callWithMemo", type: "function", stateMutability: "payable",

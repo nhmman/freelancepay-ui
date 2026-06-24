@@ -251,7 +251,33 @@ export default function Home() {
           </div>
         )}
 
-        {/* QUICK SEND + FEATURES */}
+              {/* PAY LINK QUICK ACCESS */}
+      {mounted && isConnected && onChainUsername && (
+        <div style={{ maxWidth:900, margin:"0 auto 16px", padding:"0 24px" }}>
+          <a href={`/pay/${onChainUsername}`} target="_blank" rel="noopener noreferrer"
+            style={{ display:"flex", alignItems:"center", justifyContent:"space-between",
+              background:"linear-gradient(135deg,#2775CA,#1855A0)",
+              border:"none", borderRadius:14, padding:"14px 20px",
+              textDecoration:"none", cursor:"pointer" }}>
+            <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+              <span style={{ fontSize:18 }}>🔗</span>
+              <div>
+                <div style={{ fontSize:14, fontWeight:800, color:"#FFFFFF", letterSpacing:"-0.2px" }}>
+                  Your Pay Link
+                </div>
+                <div style={{ fontFamily:"IBM Plex Mono,monospace", fontSize:12, color:"rgba(255,255,255,0.7)", marginTop:1 }}>
+                  earn.arcstation.xyz/pay/{onChainUsername as string}
+                </div>
+              </div>
+            </div>
+            <div style={{ fontFamily:"IBM Plex Mono,monospace", fontSize:13, color:"rgba(255,255,255,0.85)", fontWeight:700 }}>
+              Share →
+            </div>
+          </a>
+        </div>
+      )}
+
+      {/* QUICK SEND + FEATURES */}
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:20, marginBottom:24 }}>
           <div style={{ background:"#FFFFFF", border:"1px solid #E2EAF8", borderRadius:20, padding:28 }}>
             <div style={{ ...M, fontSize:13, color:"#2775CA", marginBottom:14 }}>// quick send</div>
