@@ -208,7 +208,7 @@ export default function MilestonesPage() {
             <div style={{ background: "#FFFFFF", border: "1px solid #E2EAF8", borderRadius: 20, padding: 28, marginBottom: 28 }}>
               <div style={{ ...M, fontSize: 15, color: "#2775CA", marginBottom: 16 }}>// new escrow</div>
               <div style={{ marginBottom: 14 }}>
-                <div style={{ ...M, fontSize: 15, fontWeight: 600, color: "#3B5878", fontWeight: 600, marginBottom: 8 }}>BENEFICIARY (pay link username)</div>
+                <div style={{ ...M, fontSize: 15, fontWeight: 600, color: "#3B5878", marginBottom: 8 }}>BENEFICIARY (pay link username)</div>
                 <input value={bUsername} onChange={e => setBUsername(e.target.value)} placeholder="e.g. leo" />
                 {slug.length >= 2 && (
                   <div style={{ ...M, fontSize: 15, fontWeight: 600, marginTop: 6, color: beneficiaryAddress ? "#2775CA" : "#DC2626" }}>
@@ -218,11 +218,11 @@ export default function MilestonesPage() {
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 14, marginBottom: 14 }}>
                 <div>
-                  <div style={{ ...M, fontSize: 15, fontWeight: 600, color: "#3B5878", fontWeight: 600, marginBottom: 8 }}>AMOUNT (USDC)</div>
+                  <div style={{ ...M, fontSize: 15, fontWeight: 600, color: "#3B5878", marginBottom: 8 }}>AMOUNT (USDC)</div>
                   <input type="number" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} placeholder="100" />
                 </div>
                 <div>
-                  <div style={{ ...M, fontSize: 15, fontWeight: 600, color: "#3B5878", fontWeight: 600, marginBottom: 8 }}>TERMS / ACCEPTANCE CRITERIA</div>
+                  <div style={{ ...M, fontSize: 15, fontWeight: 600, color: "#3B5878", marginBottom: 8 }}>TERMS / ACCEPTANCE CRITERIA</div>
                   <input value={terms} onChange={e => setTerms(e.target.value)} placeholder="e.g. Deliver 3 logo concepts in PNG" />
                 </div>
               </div>
