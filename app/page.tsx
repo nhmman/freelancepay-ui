@@ -24,7 +24,7 @@ const REGISTRY_ABI = [
 ] as const;
 
 const FEATURES = [
-  { href:"/milestones", icon:"📋", title:"Multi-Milestone Escrow", tag:"ESCROW"   },
+  { href:"/escrow", icon:"📋", title:"Multi-Milestone Escrow", tag:"ESCROW"   },
   { href:"/nanopay",    icon:"⚡", title:"Nanopayments x402",      tag:"x402"     },
   { href:"/reputation", icon:"⭐", title:"Reputation Pricing",     tag:"ERC-8004" },
   { href:"/jobs",       icon:"🤖", title:"Smart Jobs",             tag:"ERC-8183" },

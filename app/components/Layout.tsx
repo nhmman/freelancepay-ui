@@ -8,7 +8,7 @@ import { useAccount } from "wagmi";
 const NAV_ITEMS = [
   { href: "/", label: "Pay" },
   { href: "/history", label: "History" },
-  { href: "/milestones", label: "Escrow" },
+  { href: "/escrow", label: "Escrow" },
 ];
 
 export default function Layout({ children }: { children: React.ReactNode }) {
