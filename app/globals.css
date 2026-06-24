@@ -5,8 +5,8 @@
 }
 
 body {
-  background: #0a0b0d;
-  color: white;
+  background: #F4F7FD;
+  color: #0A1628;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
 }
 
@@ -19,6 +19,8 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255,255,255,0.1);
+  background: rgba(39,117,202,0.15);
   border-radius: 2px;
 }
+
+* { -webkit-font-smoothing: antialiased; }
