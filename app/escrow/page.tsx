@@ -245,8 +245,8 @@ export default function MilestonesPage() {
             {agreements.length === 0 ? (
               <div style={{ background: "#F4F7FD", border: "1px solid #E2EAF8", borderRadius: 14, padding: "40px 20px", textAlign: "center" }}>
                 <div style={{ fontSize: 28, marginBottom: 10 }}>📋</div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: "#3B5878", fontWeight: 600 }}>No escrows yet</div>
-                <div style={{ ...M, fontSize: 15, fontWeight: 600, color: "#3B5878", , marginTop: 6 }}>Create one above to get started</div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: "#3B5878" }}>No escrows yet</div>
+                <div style={{ ...M, fontSize: 15, fontWeight: 600, color: "#3B5878", marginTop: 6 }}>Create one above to get started</div>
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -259,7 +259,7 @@ export default function MilestonesPage() {
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
                         <div>
                           <div style={{ fontSize: 18, fontWeight: 800 }}>${a.amount_usdc} USDC</div>
-                          <div style={{ ...M, fontSize: 15, fontWeight: 600, color: "#3B5878", , marginTop: 2 }}>
+                          <div style={{ ...M, fontSize: 15, fontWeight: 600, color: "#3B5878", marginTop: 2 }}>
                             {dep ? `to @${a.beneficiary_username}` : `from ${short(a.depositor_address)}`} · {dep ? "you pay" : "you receive"}
                           </div>
                         </div>
