@@ -4,7 +4,7 @@ import Image from "next/image";
 
 const APPS = [
   {
-    href: "/send",
+    href: "/pay",
     icon: "🔗",
     title: "Pay Link",
     desc: "Get paid in USDC instantly. Share your link, receive in seconds.",
