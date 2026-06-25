@@ -46,7 +46,7 @@ function App() {
   const tip = () => { if (canSend) writeContract({ address: USDC, abi: ABI, functionName: "transfer", args: [toWallet, parseUnits(amount, 6)] }); };
 
   const myLink = myWallet && isAddress(myWallet)
-    ? `https://arctip.vercel.app/?to=${myWallet}&name=${encodeURIComponent(myName)}`
+    ? `https://arcstation.xyz/tip?to=${myWallet}&name=${encodeURIComponent(myName)}`
     : "";
   const copyLink = () => {
     if (myLink) {
