@@ -3,15 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   async redirects() {
     return [
-      // /pay without username → redirect về trang chính
-      {
-        source: "/pay",
-        destination: "/",
-        permanent: false,
-      },
-      // /pay → /send (avoid conflict with /pay/[username])
-      { source: "/pay", destination: "/send", permanent: false },
-// /milestones → /escrow (backward compat)
+      // /milestones → /escrow (backward compat)
       {
         source: "/milestones",
         destination: "/escrow",
