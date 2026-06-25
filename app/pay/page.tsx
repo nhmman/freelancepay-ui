@@ -336,7 +336,7 @@ export default function Home() {
           </div>
         </div>
         <div style={{ ...M, fontSize:12, color:"#C5D9F5", textAlign:"center" as const }}>
-          FreelancePay · ArcStation · Arc Testnet · Circle USDC · ERC-8004 · ERC-8183
+          ArcStation · ArcStation · Arc Testnet · Circle USDC · ERC-8004 · ERC-8183
         </div>
       </div>
     </Layout>
