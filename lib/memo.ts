@@ -1,46 +1,54 @@
 // lib/memo.ts
-// Memo-ready payment helper for Arc Testnet (v0.7.2+)
-//
-// Arc v0.7.2 (activates 2026-06-18 12:00 UTC) adds a predeployed "Memo"
-// transaction-extension contract. It lets you attach an on-chain payment
-// reference (invoice id, order id, note) to a transfer while preserving
-// the original msg.sender via the CallFrom precompile.
-//
-// STATUS: Until the official Memo contract address + ABI are published,
-// MEMO_ENABLED stays false and buildTransfer() falls back to a normal
-// USDC transfer. The app keeps working exactly as today.
-//
-// TO ACTIVATE (after 2026-06-18, once docs publish the address + ABI):
-//   1) set MEMO_ADDRESS to the real Memo contract address
-//   2) confirm MEMO_ABI matches the published interface
-//   3) set MEMO_ENABLED = true
+// Transaction Memo integration — Arc v0.7.2
+// Official docs: https://docs.arc.io/arc/concepts/transaction-memos
 
-import { encodeFunctionData, parseUnits, type Address } from "viem";
+import { type Address, encodeFunctionData, keccak256, toHex, stringToBytes } from "viem";
 
-export const USDC: Address = "0x3600000000000000000000000000000000000000";
-
-export const USDC_ABI = [
-  { name: "transfer", type: "function", stateMutability: "nonpayable",
-    inputs: [{ name: "to", type: "address" }, { name: "amount", type: "uint256" }],
-    outputs: [{ name: "", type: "bool" }] },
-] as const;
-
-// ── Memo contract (FILL IN AFTER 2026-06-18) ──
-export const MEMO_ENABLED = false;
+export const MEMO_ENABLED = true;
 export const MEMO_ADDRESS: Address = "0x5294E9927c3306DcBaDb03fe70b92e01cCede505";
+export const USDC_ADDRESS: Address = "0x3600000000000000000000000000000000000000";
 
+// Official Memo contract ABI
 export const MEMO_ABI = [
-  { name: "callWithMemo", type: "function", stateMutability: "payable",
+  {
+    name: "memo",
+    type: "function",
+    stateMutability: "nonpayable",
     inputs: [
-      { name: "memo", type: "bytes" },
       { name: "target", type: "address" },
       { name: "data", type: "bytes" },
+      { name: "memoId", type: "bytes32" },
+      { name: "memoData", type: "bytes" },
     ],
-    outputs: [{ name: "result", type: "bytes" }] },
+    outputs: [],
+  },
+  {
+    name: "Memo",
+    type: "event",
+    inputs: [
+      { name: "sender", type: "address", indexed: true },
+      { name: "target", type: "address", indexed: true },
+      { name: "callDataHash", type: "bytes32", indexed: false },
+      { name: "memoId", type: "bytes32", indexed: true },
+      { name: "memo", type: "bytes", indexed: false },
+      { name: "memoIndex", type: "uint256", indexed: false },
+    ],
+  },
 ] as const;
 
-// ── Memo validation ──
-export const MEMO_MAX_BYTES = 120;
+// USDC transfer ABI (target call to be wrapped)
+const USDC_TRANSFER_ABI = [
+  {
+    name: "transfer",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "to", type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [{ name: "", type: "bool" }],
+  },
+] as const;
 
 export function memoByteLength(memo: string): number {
   return new TextEncoder().encode(memo).length;
@@ -48,51 +56,44 @@ export function memoByteLength(memo: string): number {
 
 export function validateMemo(memo: string): { ok: boolean; reason?: string } {
   const trimmed = memo.trim();
-  if (trimmed.length === 0) return { ok: true };
+  if (!trimmed) return { ok: true };
   const bytes = memoByteLength(trimmed);
-  if (bytes > MEMO_MAX_BYTES) {
-    return { ok: false, reason: `Memo too long (${bytes}/${MEMO_MAX_BYTES} bytes)` };
+  if (bytes > 200) {
+    return { ok: false, reason: `Memo too long (${bytes}/200 bytes)` };
   }
   return { ok: true };
 }
 
-function memoToHex(memo: string): `0x${string}` {
-  const bytes = new TextEncoder().encode(memo.trim());
-  let hex = "0x";
-  for (const b of bytes) hex += b.toString(16).padStart(2, "0");
-  return hex as `0x${string}`;
-}
-
-// ── The one call the UI uses ──
-export function buildTransfer(opts: {
+/**
+ * Build the params for calling Memo.memo() to send USDC with a memo attached.
+ * Returns the args ready for writeContract({ address: MEMO_ADDRESS, abi: MEMO_ABI, functionName: "memo", args })
+ */
+export function buildMemoTransfer(opts: {
   to: Address;
-  amountUsdc: string;
+  amountRaw: bigint; // USDC amount in 6-decimal raw units
   memo?: string;
 }) {
-  const amount = parseUnits(opts.amountUsdc, 6);
-  const memo = (opts.memo ?? "").trim();
+  const memoText = (opts.memo ?? "").trim();
 
-  if (!memo || !MEMO_ENABLED) {
-    return {
-      address: USDC,
-      abi: USDC_ABI,
-      functionName: "transfer" as const,
-      args: [opts.to, amount] as const,
-      gas: BigInt(120000),
-    };
-  }
-
-  const innerData = encodeFunctionData({
-    abi: USDC_ABI,
+  // Encode the inner USDC transfer(to, amount) call
+  const transferData = encodeFunctionData({
+    abi: USDC_TRANSFER_ABI,
     functionName: "transfer",
-    args: [opts.to, amount],
+    args: [opts.to, opts.amountRaw],
   });
+
+  // memoId: unique id per memo call — hash of recipient + timestamp
+  const memoId = keccak256(
+    toHex(`${opts.to}-${Date.now()}-${Math.random()}`)
+  );
+
+  // memoData: the actual note text, encoded as bytes
+  const memoData = memoText ? toHex(stringToBytes(memoText)) : "0x";
 
   return {
     address: MEMO_ADDRESS,
     abi: MEMO_ABI,
-    functionName: "callWithMemo" as const,
-    args: [memoToHex(memo), USDC, innerData] as const,
-    gas: BigInt(200000),
+    functionName: "memo" as const,
+    args: [USDC_ADDRESS, transferData, memoId, memoData] as const,
   };
 }
