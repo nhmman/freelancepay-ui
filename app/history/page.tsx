@@ -27,6 +27,7 @@ type Tx = {
   counterparty: string;
   amount: string;
   time: string;
+  memo?: string;
 };
 
 export default function HistoryPage() {
@@ -83,6 +84,43 @@ export default function HistoryPage() {
       const merged = Array.from(byHash.values()).sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
 
       setTxs(merged);
+
+      // Fetch memos for recent txs (Blockscout pre-decodes them)
+      const MEMO_METHOD_ID = "eb15ee72";
+      const hexToText = (hex: string): string => {
+        try {
+          const clean = hex.startsWith("0x") ? hex.slice(2) : hex;
+          let out = "";
+          for (let i = 0; i < clean.length; i += 2) {
+            const code = parseInt(clean.substr(i, 2), 16);
+            if (code > 0) out += String.fromCharCode(code);
+          }
+          return out.trim();
+        } catch { return ""; }
+      };
+      const memoMap = new Map<string, string>();
+      await Promise.all(merged.slice(0, 15).map(async (t) => {
+        try {
+          const logRes = await fetch(`${API}/transactions/${t.hash}/logs`);
+          if (!logRes.ok) return;
+          const logData = await logRes.json();
+          const memoLog = (logData?.items ?? []).find(
+            (l: any) => l?.decoded?.method_id === MEMO_METHOD_ID
+          );
+          if (memoLog) {
+            const memoParam = (memoLog.decoded?.parameters ?? []).find(
+              (p: any) => p?.name === "memo"
+            );
+            if (memoParam?.value) {
+              const decoded = hexToText(memoParam.value);
+              if (decoded) memoMap.set(t.hash, decoded);
+            }
+          }
+        } catch { /* ignore */ }
+      }));
+      if (memoMap.size > 0) {
+        setTxs(merged.map(t => memoMap.has(t.hash) ? { ...t, memo: memoMap.get(t.hash) } : t));
+      }
     } catch {
       setError(true);
     } finally {
@@ -161,6 +199,14 @@ export default function HistoryPage() {
                       </div>
                       <div style={{ ...M, fontSize: 15, fontWeight: 600, color: "#3B5878" }}>
                         {t.direction === "in" ? "from " : "to "}{short(t.counterparty)} · {timeAgo(t.time)}
+                      </div>
+                      {t.memo && (
+                        <div style={{ ...M, fontSize: 13, color: "#2775CA", marginTop: 4, display: "flex", alignItems: "center", gap: 5, background: "#EBF2FD", padding: "3px 8px", borderRadius: 6, width: "fit-content" }}>
+                          <span style={{ fontSize: 11 }}>&#128172;</span>
+                          <span style={{ fontWeight: 600 }}>{t.memo}</span>
+                        </div>
+                      )}
+                      <div style={{ display: "none" }}>
                       </div>
                     </div>
                     <div style={{ textAlign: "right", flexShrink: 0 }}>
