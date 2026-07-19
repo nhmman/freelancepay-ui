@@ -94,11 +94,11 @@ export default function Home() {
       <nav style={{ padding:"0 32px", height:60, borderBottom:"1px solid #1E2820", display:"flex", alignItems:"center", justifyContent:"space-between", position:"sticky", top:0, background:"#0E1110CC", backdropFilter:"blur(12px)", zIndex:100 }}>
         <a href="https://arcstation.xyz" style={{ display:"flex", alignItems:"center", gap:10 }}>
           <div style={{ background:"#1A2420", borderRadius:10, padding:4, display:"flex" }}>
-            <img src={LOGO_URL} alt="ArcStation" width={32} height={32} style={{ borderRadius:6, objectFit:"cover", display:"block" }} />
+            <img src={LOGO_URL} alt="Statio" width={32} height={32} style={{ borderRadius:6, objectFit:"cover", display:"block" }} />
           </div>
           <div>
             <span style={{ fontWeight:700, fontSize:14, color:"#E8EDE9" }}>FreelancePay</span>
-            <span style={{ fontSize:12, color:"#6A8E7A", marginLeft:8, fontFamily:"IBM Plex Mono, monospace" }}>by ArcStation</span>
+            <span style={{ fontSize:12, color:"#6A8E7A", marginLeft:8, fontFamily:"IBM Plex Mono, monospace" }}>by Statio</span>
           </div>
         </a>
         <div style={{ display:"flex", alignItems:"center", gap:16 }}>
@@ -301,7 +301,7 @@ export default function Home() {
 
         {/* FOOTER */}
         <div style={{ marginTop:40, textAlign:"center", fontFamily:"IBM Plex Mono, monospace", fontSize:11, color:"#4A6A5A" }}>
-          FreelancePay · ArcStation · Arc Testnet · ERC-8004 · ERC-8183
+          FreelancePay · Statio · Arc Testnet · ERC-8004 · ERC-8183
         </div>
 
       </div>

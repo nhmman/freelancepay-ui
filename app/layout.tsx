@@ -3,7 +3,7 @@ import "./globals.css";
 import Web3Provider from "./components/Web3Provider";
 
 export const metadata: Metadata = {
-  title: "ArcStation — Payments OS for Freelancers on Arc",
+  title: "Statio — Payments OS for Freelancers on Arc",
   description: "Pay Links, Escrow, Payroll and Tip — powered by Circle USDC on Arc.",
   icons: { icon: "/favicon.png", apple: "/favicon.png" } };
 

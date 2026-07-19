@@ -24,7 +24,7 @@ export default function DeployEscrow() {
     deployContract({
       abi: REFUND_ABI as any,
       bytecode: REFUND_BYTECODE,
-      args: [address as `0x${string}`, USDC as `0x${string}`, "ArcStation Escrow", "1.0"] });
+      args: [address as `0x${string}`, USDC as `0x${string}`, "Statio Escrow", "1.0"] });
   };
 
   const deployed = receipt?.contractAddress;
@@ -46,7 +46,7 @@ export default function DeployEscrow() {
         <div style={{ background: "#0E1110", border: "1px solid #1E2820", borderRadius: 12, padding: 16, marginBottom: 20, ...M, fontSize: 12, color: "#8AB8A0", lineHeight: 1.8 }}>
           <div>arbiter: <span style={{ color: "#E8EDE9" }}>{address ? `${address.slice(0,8)}...${address.slice(-6)}` : "(connect wallet)"}</span></div>
           <div>usdc: <span style={{ color: "#E8EDE9" }}>0x3600...0000</span></div>
-          <div>eip712: <span style={{ color: "#E8EDE9" }}>ArcStation Escrow v1.0</span></div>
+          <div>eip712: <span style={{ color: "#E8EDE9" }}>Statio Escrow v1.0</span></div>
         </div>
 
         {!mounted || !isConnected ? (

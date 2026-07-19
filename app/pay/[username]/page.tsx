@@ -126,10 +126,10 @@ export default function PayPage({ params }: { params: Promise<{ username: string
 
         {/* HEADER */}
         <div style={{background:"linear-gradient(135deg,#2775CA,#1855A0)",padding:"32px 28px 24px",textAlign:"center",borderBottom:"1px solid #E2EAF8",position:"relative"}}>
-          {/* ArcStation badge */}
+          {/* Statio badge */}
           <a href="/" style={{position:"absolute",top:14,left:14,display:"flex",alignItems:"center",gap:6,textDecoration:"none",...M,fontSize:13,color:"#FFFFFF",background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.3)",padding:"4px 12px",borderRadius:20}}>
-            <Image src="/arcstation-logo.svg" alt="ArcStation" width={16} height={16} style={{filter:"brightness(0) invert(1)"}}/>
-            ArcStation
+            <Image src="/arcstation-logo.svg" alt="Statio" width={16} height={16} style={{filter:"brightness(0) invert(1)"}}/>
+            Statio
           </a>
 
           {/* Wallet status top-right */}
@@ -287,7 +287,7 @@ export default function PayPage({ params }: { params: Promise<{ username: string
             )}
 
             <div style={{marginTop:18,textAlign:"center",...M,fontSize:13,color:"#5A7A6A"}}>
-              Powered by ArcStation · Arc Testnet · Circle USDC
+              Powered by Statio · Arc Testnet · Circle USDC
             </div>
           </div>
         )}

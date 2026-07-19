@@ -35,9 +35,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           {/* LEFT — Logo */}
           <Link href="/" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none", justifySelf: "start" }}>
             <div style={{ width: 36, height: 36, background: "#0A0D12", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid #2A3545", flexShrink: 0 }}>
-              <Image src="/arcstation-logo.svg" alt="ArcStation" width={26} height={26} />
+              <Image src="/arcstation-logo.svg" alt="Statio" width={26} height={26} />
             </div>
-            <span style={{ fontSize: 17, fontWeight: 800, color: "#0A1628", letterSpacing: "-0.3px", whiteSpace: "nowrap" }}>ArcStation</span>
+            <span style={{ fontSize: 17, fontWeight: 800, color: "#0A1628", letterSpacing: "-0.3px", whiteSpace: "nowrap" }}>Statio</span>
             <span style={{ fontSize: 10, fontWeight: 700, color: "#2775CA", background: "#EBF2FD", border: "1px solid #C5D9F5", padding: "2px 8px", borderRadius: 20, whiteSpace: "nowrap" }}>TESTNET</span>
           </Link>
 

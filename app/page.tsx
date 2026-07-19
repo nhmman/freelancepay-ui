@@ -48,9 +48,9 @@ export default function LandingPage() {
       <nav style={{ background: "white", borderBottom: "1px solid #E2EAF8", padding: "0 32px", height: 60, display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 50 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ width: 32, height: 32, background: "#0A0D12", borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid #2A3545" }}>
-            <Image src="/arcstation-logo.svg" alt="ArcStation" width={22} height={22} />
+            <Image src="/arcstation-logo.svg" alt="Statio" width={22} height={22} />
           </div>
-          <span style={{ fontSize: 17, fontWeight: 800, color: "#0A1628", letterSpacing: "-0.3px" }}>ArcStation</span>
+          <span style={{ fontSize: 17, fontWeight: 800, color: "#0A1628", letterSpacing: "-0.3px" }}>Statio</span>
           <span style={{ fontSize: 10, fontWeight: 700, color: "#2775CA", background: "#EBF2FD", border: "1px solid #C5D9F5", padding: "2px 7px", borderRadius: 4 }}>TESTNET</span>
         </div>
         <Link href="/pay" style={{ background: "#2775CA", color: "white", padding: "8px 20px", borderRadius: 10, fontSize: 13, fontWeight: 700, textDecoration: "none" }}>
@@ -108,7 +108,10 @@ export default function LandingPage() {
       {/* FOOTER */}
       <div style={{ borderTop: "1px solid #E2EAF8", padding: "24px", textAlign: "center" }}>
         <div style={{ fontSize: 12, color: "#4A6B8A", fontFamily: "JetBrains Mono, monospace" }}>
-          ArcStation · Arc Testnet · Circle USDC · Agent #15994
+          Statio · Arc Testnet · Circle USDC · Agent #15994
+        </div>
+        <div style={{ fontSize: 10, color: "#8AA0B8", marginTop: 6 }}>
+          Arc is a trademark of Circle Internet Group, Inc.
         </div>
       </div>
     </div>

@@ -1,4 +1,4 @@
-// TimelockEscrow — custom contract written for ArcStation.
+// TimelockEscrow — custom contract written for Statio (formerly ArcStation).
 // Real timelock: beneficiary can NEVER withdraw early. Funds release only when
 // the depositor approves, OR the deadline passes (anyone can then trigger payout).
 // Arbiter can refund only while still Funded (the dispute window).

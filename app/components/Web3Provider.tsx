@@ -12,7 +12,7 @@ const arcTestnet = {
   blockExplorers: { default: { name: "ArcScan", url: "https://testnet.arcscan.app" } } } as const;
 
 const config = getDefaultConfig({
-  appName: "ArcStation",
+  appName: "Statio",
   projectId: "2b0b4e6e3c7d4f8a9b0c1d2e3f4a5b6c",
   chains: [arcTestnet],
   transports: { [arcTestnet.id]: http("https://rpc.testnet.arc.network") } });
