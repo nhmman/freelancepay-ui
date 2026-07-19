@@ -14,6 +14,23 @@ const ARBITER = "0x7ef0bc69160888ffb934619a6d595d0a8c0c9774";
 const M: React.CSSProperties = { fontFamily: "JetBrains Mono, IBM Plex Mono, monospace", fontWeight: 600 };
 const short = (a: string) => a ? a.slice(0, 6) + "..." + a.slice(-4) : "";
 
+// Normalize a user-typed deliverable link: prepend https:// when the scheme is
+// missing, then validate with the URL parser. Without this, a bare
+// "drive.google.com/…" is treated as a relative path and <a href> resolves it
+// against the current site (arcstation.xyz/drive.google.com/…).
+const normalizeUrl = (raw: string): { ok: boolean; url?: string; error?: string } => {
+  const trimmed = raw.trim();
+  if (!trimmed) return { ok: false, error: "Please enter a link." };
+  const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  try {
+    const u = new URL(withScheme);
+    if (!u.hostname.includes(".")) return { ok: false, error: "That doesn't look like a valid URL." };
+    return { ok: true, url: u.toString() };
+  } catch {
+    return { ok: false, error: "That doesn't look like a valid URL." };
+  }
+};
+
 type Agreement = {
   id: string;
   depositor_address: string;
@@ -55,6 +72,9 @@ export default function MilestonesPage() {
   const [syncWarning, setSyncWarning] = useState<string | null>(null);
   const [retrying, setRetrying] = useState(false);
   const retrySyncRef = useRef<(() => Promise<void>) | null>(null);
+  const [deliverableEditId, setDeliverableEditId] = useState<string | null>(null);
+  const [deliverableInput, setDeliverableInput] = useState("");
+  const [deliverableError, setDeliverableError] = useState<string | null>(null);
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -108,12 +128,25 @@ export default function MilestonesPage() {
     load();
   };
 
-  const setStatus = async (id: string, status: string, extra: Record<string, unknown> = {}) => {
+  const setStatus = async (id: string, status: string, extra: Record<string, unknown> = {}): Promise<boolean> => {
     const { error } = await supabase.from("escrow_agreements")
       .update({ status, updated_at: new Date().toISOString(), ...extra })
       .eq("id", id);
-    if (error) { alert(`Couldn't save the update — ${error.message}. Please try again.`); return; }
+    if (error) { alert(`Couldn't save the update — ${error.message}. Please try again.`); return false; }
     load();
+    return true;
+  };
+
+  const openDeliverableEditor = (a: Agreement) => {
+    setDeliverableEditId(a.id);
+    setDeliverableInput(a.deliverable_url ?? "");
+    setDeliverableError(null);
+  };
+  const submitDeliverable = async (a: Agreement) => {
+    const res = normalizeUrl(deliverableInput);
+    if (!res.ok) { setDeliverableError(res.error ?? "Invalid link"); return; }
+    const ok = await setStatus(a.id, "SUBMITTED", { deliverable_url: res.url });
+    if (ok) { setDeliverableEditId(null); setDeliverableInput(""); setDeliverableError(null); }
   };
 
   // After a successful on-chain tx, persist the new status. The on-chain action is
@@ -331,15 +364,18 @@ export default function MilestonesPage() {
                         {dep && a.status === "DRAFT" && (
                           <button onClick={() => fundEscrow(a)} disabled={fundingId === a.id} style={btnPrimary}>{fundingId === a.id ? fundStep || "Processing..." : "Fund Escrow →"}</button>
                         )}
-                        {ben && a.status === "FUNDED" && (
-                          <button onClick={() => {
-                            const url = prompt("Link to your deliverable (image/file URL):");
-                            if (url) setStatus(a.id, "SUBMITTED", { deliverable_url: url });
-                          }} style={btnGhost}>Submit Work</button>
+                        {ben && a.status === "FUNDED" && deliverableEditId !== a.id && (
+                          <button onClick={() => openDeliverableEditor(a)} style={btnGhost}>Submit Work</button>
                         )}
-                        {a.deliverable_url && (a.status === "SUBMITTED" || a.status === "RELEASED") && (
-                          <a href={a.deliverable_url} target="_blank" rel="noopener noreferrer" style={{ ...btnGhost, textDecoration: "none" }}>View deliverable ↗</a>
+                        {ben && a.status === "SUBMITTED" && deliverableEditId !== a.id && (
+                          <button onClick={() => openDeliverableEditor(a)} style={btnGhost}>Edit link</button>
                         )}
+                        {a.deliverable_url && (a.status === "SUBMITTED" || a.status === "RELEASED") && (() => {
+                          const dl = normalizeUrl(a.deliverable_url);
+                          return dl.ok ? (
+                            <a href={dl.url} target="_blank" rel="noopener noreferrer" style={{ ...btnGhost, textDecoration: "none" }}>View deliverable ↗</a>
+                          ) : null;
+                        })()}
                         {dep && a.status === "SUBMITTED" && a.payment_id !== null && (
                           <button onClick={() => releasePayment(a)} disabled={actingId === a.id} style={btnPrimary}>
                             {actingId === a.id ? actStep || "Processing..." : "Approve & Release"}
@@ -356,6 +392,26 @@ export default function MilestonesPage() {
                           </span>
                         )}
                       </div>
+
+                      {deliverableEditId === a.id && (
+                        <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid #F0F5FF" }}>
+                          <div style={{ ...M, fontSize: 14, fontWeight: 600, color: "#3B5878", marginBottom: 8 }}>Deliverable link</div>
+                          <input
+                            value={deliverableInput}
+                            onChange={e => { setDeliverableInput(e.target.value); if (deliverableError) setDeliverableError(null); }}
+                            onKeyDown={e => { if (e.key === "Enter") submitDeliverable(a); }}
+                            placeholder="drive.google.com/…  or  https://…"
+                            autoFocus
+                          />
+                          {deliverableError && (
+                            <div style={{ ...M, fontSize: 13, fontWeight: 600, color: "#DC2626", marginTop: 6 }}>✗ {deliverableError}</div>
+                          )}
+                          <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+                            <button onClick={() => submitDeliverable(a)} style={btnPrimary}>Save link</button>
+                            <button onClick={() => { setDeliverableEditId(null); setDeliverableError(null); }} style={btnGhost}>Cancel</button>
+                          </div>
+                        </div>
+                      )}
 
                     </div>
                   );
