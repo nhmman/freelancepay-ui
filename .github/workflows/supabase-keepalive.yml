@@ -1,0 +1,38 @@
+name: Supabase keep-alive
+
+# Supabase free-tier projects are auto-paused after ~7 days with no API activity.
+# This job pings the REST API once a day so the escrow backend stays awake.
+# A daily run leaves ~7x margin against the pause window.
+#
+# One-time setup (Settings → Secrets and variables → Actions → New repository secret):
+#   SUPABASE_URL       e.g. https://fffneqzsxrzmwpkctkvb.supabase.co   (public, from .env.local)
+#   SUPABASE_ANON_KEY  the NEXT_PUBLIC_SUPABASE_ANON_KEY value          (already public / client-side)
+# The anon key is safe to store as a secret; it is the same key shipped to the browser.
+
+on:
+  schedule:
+    - cron: "17 6 * * *"   # 06:17 UTC every day
+  workflow_dispatch: {}      # allow manual "Run workflow" to test immediately
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase REST (keeps project active)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_ANON_KEY:-}" ]; then
+            echo "::error::SUPABASE_URL / SUPABASE_ANON_KEY secrets are not set. See the setup note at the top of this workflow."
+            exit 1
+          fi
+          # Lightweight authenticated SELECT so the request actually reaches the DB
+          # (a real query counts as activity; -f makes curl fail on any HTTP 4xx/5xx
+          # so a deleted/broken project surfaces as a failed run + notification).
+          code=$(curl -sS -f -o /dev/null -w "%{http_code}" \
+            -H "apikey: ${SUPABASE_ANON_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" \
+            "${SUPABASE_URL}/rest/v1/escrow_agreements?select=id&limit=1")
+          echo "Supabase responded HTTP ${code} — project is awake."
