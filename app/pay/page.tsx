@@ -6,6 +6,7 @@ import { parseUnits, isAddress } from "viem";
 import Layout from "../components/Layout";
 import Link from "next/link";
 import { REGISTRY_ADDRESS as REGISTRY, REGISTRY_ABI } from "../../lib/registry";
+import { buildMemoTransfer, validateMemo, memoByteLength, MEMO_ENABLED } from "../../lib/memo";
 
 const USDC     = "0x3600000000000000000000000000000000000000" as const;
 const ARC_ID   = 5042002;
@@ -31,6 +32,7 @@ export default function Home() {
   const [inputUsername, setInputUsername] = useState("");
   const [copied, setCopied]       = useState(false);
   const [amount, setAmount]       = useState("5");
+  const [note, setNote]           = useState("");
   const [recipient, setRecipient] = useState("");
   const [mounted, setMounted]     = useState(false);
 
@@ -103,6 +105,8 @@ export default function Home() {
         : "");
 
   const addrOk = isAddress(resolvedAddr);
+  const noteBytes = memoByteLength(note);
+  const noteOverLimit = noteBytes > 200;
 
   const handleClaim = () => {
     if (!claimSlug || !claimValid) return;
@@ -114,7 +118,19 @@ export default function Home() {
     if (!onArc)   return "Switch to Arc Testnet";
     return `Send ${amount} USDC →`;
   };
-  const btnAction = () => !onArc ? switchChain({ chainId: ARC_ID }) : (reset(), sendUSDC({ address: USDC, abi: USDC_ABI, functionName: "transfer", args: [resolvedAddr as `0x${string}`, parseUnits(amount, 6)] }));
+  const btnAction = () => {
+    if (!onArc) { switchChain({ chainId: ARC_ID }); return; }
+    if (!validateMemo(note).ok) return; // guard: over 200 bytes
+    reset();
+    const amountRaw = parseUnits(amount, 6);
+    if (MEMO_ENABLED && note.trim()) {
+      // With a note: wrap the USDC transfer in Memo.memo() so the note lands on-chain.
+      sendUSDC(buildMemoTransfer({ to: resolvedAddr as `0x${string}`, amountRaw, memo: note }) as any);
+    } else {
+      // No note: plain USDC.transfer — don't route through the Memo contract unnecessarily.
+      sendUSDC({ address: USDC, abi: USDC_ABI, functionName: "transfer", args: [resolvedAddr as `0x${string}`, amountRaw] });
+    }
+  };
 
   return (
     <Layout>
@@ -303,10 +319,19 @@ export default function Home() {
                 ))}
               </div>
             </div>
+            <div style={{ marginBottom:20 }}>
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:8 }}>
+                <div style={{ ...M, fontSize:12, color:"#6B8DB8" }}>NOTE (optional)</div>
+                <div style={{ ...M, fontSize:11, color:noteOverLimit?"#DC2626":"#9BB5C8" }}>{noteBytes} / 200</div>
+              </div>
+              <input value={note} onChange={e=>setNote(e.target.value)} placeholder="What's this for? (attached on-chain)"
+                style={{ width:"100%", background:"#F4F7FD", border:`1px solid ${noteOverLimit?"#DC262655":"#E2EAF8"}`, borderRadius:10, padding:"12px 14px", fontSize:14, color:"#0A1628", ...M }}/>
+              {noteOverLimit && <div style={{ ...M, fontSize:12, color:"#DC2626", marginTop:6 }}>✗ Note too long — {noteBytes}/200 bytes</div>}
+            </div>
             {!mounted||!isConnected ? (
               <div style={{ display:"flex", justifyContent:"center" }}><ConnectButton label="Connect Wallet to Send" /></div>
             ) : (
-              <button onClick={btnAction} disabled={isPending||(!onArc?false:!addrOk||!amount)}
+              <button onClick={btnAction} disabled={isPending||noteOverLimit||(!onArc?false:!addrOk||!amount)}
                 style={{ width:"100%", padding:"15px", borderRadius:12, border:"none", cursor:"pointer", background:!onArc?"linear-gradient(135deg,#F59E0B,#D97706)":addrOk?"linear-gradient(135deg,#2775CA,#1855A0)":"#EBF2FD", color:!onArc?"#FFF8E0":addrOk?"#FFFFFF":"#9BB5C8", fontSize:15, fontWeight:800, display:"flex", alignItems:"center", justifyContent:"center", gap:8, boxShadow:addrOk&&onArc?"0 4px 20px #2775CA33":"none" }}>
                 {isPending?(<><div style={{ width:17, height:17, border:"2px solid #ffffff44", borderTopColor:"#fff", borderRadius:"50%", animation:"spin 0.7s linear infinite" }}/>Confirm in MetaMask...</>):btnLabel()}
               </button>
