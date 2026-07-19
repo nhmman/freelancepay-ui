@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useAccount, useReadContract, useChainId, useSwitchChain, useWriteContract, usePublicClient } from "wagmi";
 import { parseUnits } from "viem";
 import { TIMELOCK_ADDRESS, USDC_ADDRESS, TIMELOCK_ABI, USDC_APPROVE_ABI } from "../../lib/timelockEscrow";
@@ -50,6 +50,11 @@ export default function MilestonesPage() {
 
   const [agreements, setAgreements] = useState<Agreement[]>([]);
   const [loading, setLoading] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [syncWarning, setSyncWarning] = useState<string | null>(null);
+  const [retrying, setRetrying] = useState(false);
+  const retrySyncRef = useRef<(() => Promise<void>) | null>(null);
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -65,12 +70,17 @@ export default function MilestonesPage() {
   const load = useCallback(async () => {
     if (!me) return;
     setLoading(true);
+    setLoadError(null);
     const { data, error } = await supabase
       .from("escrow_agreements")
       .select("*")
       .or(`depositor_address.eq.${me},beneficiary_address.eq.${me}`)
       .order("created_at", { ascending: false });
-    if (!error) setAgreements((data as Agreement[]) || []);
+    if (error) {
+      setLoadError(`Couldn't load escrows — ${error.message}. Check your connection and Refresh.`);
+    } else {
+      setAgreements((data as Agreement[]) || []);
+    }
     setLoading(false);
   }, [me]);
 
@@ -79,23 +89,62 @@ export default function MilestonesPage() {
   const createEscrow = async () => {
     if (!me || !beneficiaryAddress || !amount || !terms.trim()) return;
     setCreating(true);
-    await supabase.from("escrow_agreements").insert({
+    setCreateError(null);
+    const { error } = await supabase.from("escrow_agreements").insert({
       depositor_address: me,
       beneficiary_username: slug,
       beneficiary_address: beneficiaryAddress.toLowerCase(),
       amount_usdc: parseFloat(amount),
       terms: terms.trim(),
       status: "DRAFT" });
-    setBUsername(""); setAmount(""); setTerms("");
     setCreating(false);
+    if (error) {
+      // Surface the failure instead of silently clearing the form — keeps the
+      // user's input so they can retry once the backend is reachable again.
+      setCreateError(`Couldn't create escrow — ${error.message}`);
+      return;
+    }
+    setBUsername(""); setAmount(""); setTerms("");
     load();
   };
 
   const setStatus = async (id: string, status: string, extra: Record<string, unknown> = {}) => {
-    await supabase.from("escrow_agreements")
+    const { error } = await supabase.from("escrow_agreements")
       .update({ status, updated_at: new Date().toISOString(), ...extra })
       .eq("id", id);
+    if (error) { alert(`Couldn't save the update — ${error.message}. Please try again.`); return; }
     load();
+  };
+
+  // After a successful on-chain tx, persist the new status. The on-chain action is
+  // already FINAL, so a DB-write failure must NOT read like a failure the user should
+  // retry — repeating fund/release/refund could move funds twice. Instead we warn
+  // loudly and offer "Retry sync", which only re-runs the DB write (never the tx).
+  const persistAfterTx = useCallback(async (
+    id: string, fields: Record<string, unknown>, label: string, txHash: string,
+  ) => {
+    const { error } = await supabase.from("escrow_agreements")
+      .update({ ...fields, updated_at: new Date().toISOString() })
+      .eq("id", id);
+    if (error) {
+      retrySyncRef.current = () => persistAfterTx(id, fields, label, txHash);
+      setSyncWarning(
+        `On-chain ${label} succeeded and is FINAL (tx ${txHash.slice(0, 10)}…) — but saving the new ` +
+        `status to the database failed: ${error.message}. Do NOT repeat the ${label}; the funds already ` +
+        `moved. Press "Retry sync" to save the status again — this never re-runs the transaction.`,
+      );
+      return;
+    }
+    retrySyncRef.current = null;
+    setSyncWarning(null);
+    load();
+  }, [load]);
+
+  const retrySync = async () => {
+    if (!retrySyncRef.current) return;
+    setRetrying(true);
+    await retrySyncRef.current();
+    setRetrying(false);
   };
 
   const pc = usePublicClient();
@@ -124,9 +173,7 @@ export default function MilestonesPage() {
       await pc.waitForTransactionReceipt({ hash: fundHash });
       const paymentId = Number(idBefore);
 
-      await supabase.from("escrow_agreements").update({
-        status: "FUNDED", payment_id: paymentId, tx_hash_fund: fundHash, updated_at: new Date().toISOString() }).eq("id", a.id);
-      load();
+      await persistAfterTx(a.id, { status: "FUNDED", payment_id: paymentId, tx_hash_fund: fundHash }, "funding", fundHash);
     } catch (e: any) {
       alert("Funding failed or rejected: " + (e?.shortMessage || e?.message || "unknown"));
     } finally {
@@ -146,8 +193,7 @@ export default function MilestonesPage() {
         address: TIMELOCK_ADDRESS, abi: TIMELOCK_ABI, functionName: "release",
         args: [BigInt(a.payment_id)] });
       await pc.waitForTransactionReceipt({ hash });
-      await supabase.from("escrow_agreements").update({ status: "RELEASED", tx_hash_release: hash, updated_at: new Date().toISOString() }).eq("id", a.id);
-      load();
+      await persistAfterTx(a.id, { status: "RELEASED", tx_hash_release: hash }, "release", hash);
     } catch (e: any) { alert("Release failed: " + (e?.shortMessage || e?.message || "")); }
     finally { setActingId(null); setActStep(""); }
   };
@@ -160,8 +206,7 @@ export default function MilestonesPage() {
         address: TIMELOCK_ADDRESS, abi: TIMELOCK_ABI, functionName: "refund",
         args: [BigInt(a.payment_id)] });
       await pc.waitForTransactionReceipt({ hash });
-      await supabase.from("escrow_agreements").update({ status: "REFUNDED", tx_hash_release: hash, updated_at: new Date().toISOString() }).eq("id", a.id);
-      load();
+      await persistAfterTx(a.id, { status: "REFUNDED", tx_hash_release: hash }, "refund", hash);
     } catch (e: any) { alert("Refund failed: " + (e?.shortMessage || e?.message || "")); }
     finally { setActingId(null); setActStep(""); }
   };
@@ -193,6 +238,18 @@ export default function MilestonesPage() {
           </div>
         ) : (
           <>
+            {syncWarning && (
+              <div style={{ background: "#FFF7ED", border: "2px solid #F59E0B", borderRadius: 14, padding: "16px 18px", marginBottom: 20 }}>
+                <div style={{ ...M, fontSize: 14, fontWeight: 700, color: "#B45309", lineHeight: 1.6, marginBottom: 12 }}>
+                  ⚠️ {syncWarning}
+                </div>
+                <button onClick={retrySync} disabled={retrying}
+                  style={{ ...M, fontSize: 14, fontWeight: 700, color: "#FFFFFF", background: "#B45309", border: "none", borderRadius: 10, padding: "10px 18px", cursor: retrying ? "wait" : "pointer" }}>
+                  {retrying ? "Syncing..." : "↻ Retry sync"}
+                </button>
+              </div>
+            )}
+
             <div style={{ background: "#FFFFFF", border: "1px solid #E2EAF8", borderRadius: 20, padding: 28, marginBottom: 28 }}>
               <div style={{ ...M, fontSize: 15, color: "#2775CA", marginBottom: 16 }}>// new escrow</div>
               <div style={{ marginBottom: 14 }}>
@@ -221,6 +278,11 @@ export default function MilestonesPage() {
                   cursor: canCreate && !creating ? "pointer" : "not-allowed" }}>
                 {creating ? "Creating..." : "Create Escrow Agreement"}
               </button>
+              {createError && (
+                <div style={{ ...M, fontSize: 13, fontWeight: 600, color: "#DC2626", background: "#FFF5F5", border: "1px solid #FECACA", borderRadius: 10, padding: "10px 14px", marginTop: 12, lineHeight: 1.5 }}>
+                  ✗ {createError}
+                </div>
+              )}
             </div>
 
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
@@ -229,6 +291,12 @@ export default function MilestonesPage() {
                 {loading ? "..." : "↻ Refresh"}
               </button>
             </div>
+
+            {loadError && (
+              <div style={{ ...M, fontSize: 13, fontWeight: 600, color: "#DC2626", background: "#FFF5F5", border: "1px solid #FECACA", borderRadius: 12, padding: "12px 16px", marginBottom: 14, lineHeight: 1.5 }}>
+                ✗ {loadError}
+              </div>
+            )}
 
             {agreements.length === 0 ? (
               <div style={{ background: "#F4F7FD", border: "1px solid #E2EAF8", borderRadius: 14, padding: "40px 20px", textAlign: "center" }}>
