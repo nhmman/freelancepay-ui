@@ -6,12 +6,8 @@ import { TIMELOCK_ADDRESS, USDC_ADDRESS, TIMELOCK_ABI, USDC_APPROVE_ABI } from "
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import Layout from "../components/Layout";
 import { supabase } from "../../lib/supabase";
+import { REGISTRY_ADDRESS as REGISTRY, REGISTRY_ABI } from "../../lib/registry";
 
-const REGISTRY = "0xe5f0beff4b982d59b93ee80204888d4a0406eb33" as const;
-const REGISTRY_ABI = [
-  { name: "getAddress", type: "function", stateMutability: "view",
-    inputs: [{ name: "username", type: "string" }], outputs: [{ name: "", type: "address" }] },
-] as const;
 const ZERO = "0x0000000000000000000000000000000000000000";
 const ARC_ID = 5042002;
 const ARBITER = "0x7ef0bc69160888ffb934619a6d595d0a8c0c9774";

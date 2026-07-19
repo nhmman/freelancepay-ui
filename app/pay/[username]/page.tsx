@@ -6,15 +6,11 @@ import Image from "next/image";
 import { QRCodeSVG } from "qrcode.react";
 import { parseUnits, isAddress } from "viem";
 import { buildMemoTransfer, validateMemo, MEMO_ENABLED } from "../../../lib/memo";
+import { REGISTRY_ADDRESS as REGISTRY, REGISTRY_ABI } from "../../../lib/registry";
 
 const USDC     = "0x3600000000000000000000000000000000000000" as const;
-const REGISTRY = "0xe5f0beff4b982d59b93ee80204888d4a0406eb33" as const;
 const ARC_ID   = 5042002;
 const USDC_ABI = [{ name:"transfer", type:"function", stateMutability:"nonpayable", inputs:[{name:"to",type:"address"},{name:"amount",type:"uint256"}], outputs:[{name:"",type:"bool"}] }] as const;
-const REGISTRY_ABI = [
-  { name:"getAddress",  type:"function", stateMutability:"view", inputs:[{name:"username",type:"string"}],  outputs:[{name:"",type:"address"}] },
-  { name:"getUsername", type:"function", stateMutability:"view", inputs:[{name:"owner",type:"address"}],    outputs:[{name:"",type:"string"}]  },
-] as const;
 const ERC20_ABI = [{ name:"balanceOf", type:"function", stateMutability:"view", inputs:[{name:"account",type:"address"}], outputs:[{name:"",type:"uint256"}] }] as const;
 const FALLBACK_MAP: Record<string, string> = { "leo": "0x8b0e1414fb67888c9df36490fbdd342d9dc6c64c" };
 const short = (a: string) => a.slice(0,6)+"..."+a.slice(-4);

@@ -5,23 +5,15 @@ import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { parseUnits, isAddress } from "viem";
 import Layout from "../components/Layout";
 import Link from "next/link";
+import { REGISTRY_ADDRESS as REGISTRY, REGISTRY_ABI } from "../../lib/registry";
 
 const USDC     = "0x3600000000000000000000000000000000000000" as const;
-const REGISTRY = "0xe5f0beff4b982d59b93ee80204888d4a0406eb33" as const;
 const ARC_ID   = 5042002;
 const BASE     = "https://arcstation.xyz/pay/";
 const short    = (a:string) => a.slice(0,6)+"..."+a.slice(-4);
 const M: React.CSSProperties = { fontFamily:"IBM Plex Mono,monospace" };
 
 const USDC_ABI = [{ name:"transfer", type:"function", stateMutability:"nonpayable", inputs:[{name:"to",type:"address"},{name:"amount",type:"uint256"}], outputs:[{name:"",type:"bool"}] }] as const;
-
-const REGISTRY_ABI = [
-  {"name":"claim","type":"function","stateMutability":"nonpayable","inputs":[{"name":"username","type":"string"}],"outputs":[]},
-  {"name":"release","type":"function","stateMutability":"nonpayable","inputs":[],"outputs":[]},
-  {"name":"getAddress","type":"function","stateMutability":"view","inputs":[{"name":"username","type":"string"}],"outputs":[{"name":"","type":"address"}]},
-  {"name":"getUsername","type":"function","stateMutability":"view","inputs":[{"name":"owner","type":"address"}],"outputs":[{"name":"","type":"string"}]},
-  {"name":"isAvailable","type":"function","stateMutability":"view","inputs":[{"name":"username","type":"string"}],"outputs":[{"name":"","type":"bool"}]}
-] as const;
 
 const FEATURES = [
   { href:"/escrow", icon:"📋", title:"Multi-Milestone Escrow", tag:"ESCROW"   },
