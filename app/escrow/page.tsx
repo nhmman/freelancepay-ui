@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useAccount, useReadContract, useChainId, useSwitchChain, useWriteContract, usePublicClient } from "wagmi";
-import { parseUnits } from "viem";
+import { parseUnits, isAddress } from "viem";
 import { TIMELOCK_ADDRESS, USDC_ADDRESS, TIMELOCK_ABI, USDC_APPROVE_ABI } from "../../lib/timelockEscrow";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import Layout from "../components/Layout";
@@ -78,12 +78,18 @@ export default function MilestonesPage() {
 
   useEffect(() => { setMounted(true); }, []);
 
-  const slug = bUsername.trim().toLowerCase();
+  // Beneficiary accepts EITHER a raw wallet address (used directly, no registry
+  // lookup) OR a username (resolved via the registry) — same as the Pay page.
+  const bTrimmed = bUsername.trim();
+  const isDirectAddr = isAddress(bTrimmed);
+  const slug = isDirectAddr ? "" : bTrimmed.toLowerCase();
   const { data: resolved } = useReadContract({
     address: REGISTRY, abi: REGISTRY_ABI, functionName: "getAddress",
     args: slug.length >= 2 ? [slug] : undefined,
     query: { enabled: slug.length >= 2 } });
-  const beneficiaryAddress = resolved && resolved !== ZERO ? (resolved as string) : null;
+  const beneficiaryAddress = isDirectAddr
+    ? bTrimmed
+    : (resolved && resolved !== ZERO ? (resolved as string) : null);
 
   const me = address?.toLowerCase() ?? "";
 
@@ -112,7 +118,7 @@ export default function MilestonesPage() {
     setCreateError(null);
     const { error } = await supabase.from("escrow_agreements").insert({
       depositor_address: me,
-      beneficiary_username: slug,
+      beneficiary_username: isDirectAddr ? short(bTrimmed) : slug,
       beneficiary_address: beneficiaryAddress.toLowerCase(),
       amount_usdc: parseFloat(amount),
       terms: terms.trim(),
@@ -286,11 +292,13 @@ export default function MilestonesPage() {
             <div style={{ background: "#FFFFFF", border: "1px solid #E2EAF8", borderRadius: 20, padding: 28, marginBottom: 28 }}>
               <div style={{ ...M, fontSize: 15, color: "#2775CA", marginBottom: 16 }}>// new escrow</div>
               <div style={{ marginBottom: 14 }}>
-                <div style={{ ...M, fontSize: 15, fontWeight: 600, color: "#3B5878", marginBottom: 8 }}>BENEFICIARY (pay link username)</div>
-                <input value={bUsername} onChange={e => setBUsername(e.target.value)} placeholder="e.g. leo" />
-                {slug.length >= 2 && (
+                <div style={{ ...M, fontSize: 15, fontWeight: 600, color: "#3B5878", marginBottom: 8 }}>BENEFICIARY (username or wallet address)</div>
+                <input value={bUsername} onChange={e => setBUsername(e.target.value)} placeholder="leo   or   0x1234…abcd" />
+                {(isDirectAddr || slug.length >= 2) && (
                   <div style={{ ...M, fontSize: 15, fontWeight: 600, marginTop: 6, color: beneficiaryAddress ? "#2775CA" : "#DC2626" }}>
-                    {beneficiaryAddress ? `✓ ${short(beneficiaryAddress)}` : "✗ Username not found on-chain"}
+                    {beneficiaryAddress
+                      ? (isDirectAddr ? `✓ ${short(beneficiaryAddress)} · wallet address` : `✓ ${short(beneficiaryAddress)}`)
+                      : "✗ Not a claimed username or a valid 0x address"}
                   </div>
                 )}
               </div>
