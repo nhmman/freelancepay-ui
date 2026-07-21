@@ -12,7 +12,15 @@ const USDC     = "0x3600000000000000000000000000000000000000" as const;
 const ARC_ID   = 5042002;
 const USDC_ABI = [{ name:"transfer", type:"function", stateMutability:"nonpayable", inputs:[{name:"to",type:"address"},{name:"amount",type:"uint256"}], outputs:[{name:"",type:"bool"}] }] as const;
 const ERC20_ABI = [{ name:"balanceOf", type:"function", stateMutability:"view", inputs:[{name:"account",type:"address"}], outputs:[{name:"",type:"uint256"}] }] as const;
-const FALLBACK_MAP: Record<string, string> = { "leo": "0x8b0e1414fb67888c9df36490fbdd342d9dc6c64c" };
+// Bridge fallbacks used ONLY during the registry migration window (new registry
+// empty until leo/elonmusk re-claim). The registry (chainAddr) is read FIRST, so
+// once they re-claim these become inert. Addresses are their canonical wallets so
+// pay links route correctly meanwhile — zero downtime. (Previously pointed leo at
+// an orphan 0x8b0e… wallet that had no username on-chain — that was a fund-misdirection bug.)
+const FALLBACK_MAP: Record<string, string> = {
+  leo: "0x7ef0bc69160888FFB934619A6d595d0a8C0C9774",
+  elonmusk: "0x30Bd48CC5f4C3d4A166b79A6e0D5Fc8dB0083248",
+};
 const short = (a: string) => a.slice(0,6)+"..."+a.slice(-4);
 const clr   = (s: string) => ["#2775CA","#7FA8C9","#C4CFBE","#6B8DB8","#9B8EC4","#C4A882"][s.charCodeAt(0)%6];
 const M: React.CSSProperties = { fontFamily:"IBM Plex Mono,monospace" };
