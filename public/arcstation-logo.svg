@@ -1,3 +1,7 @@
-<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-  <path d="M100 20 Q118 82 180 100 Q118 118 100 180 Q82 118 20 100 Q82 82 100 20 Z" fill="#2775CA"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 70" fill="none" role="img" aria-label="Statio">
+  <!-- Shield split in two halves: client (left) · freelancer (right) -->
+  <path d="M30 2 L56 12 V34 C56 52 44 63 30 68 V2 Z" fill="#2775CA"/>
+  <path d="M30 2 L4 12 V34 C4 52 16 63 30 68 V2 Z" fill="#1b5fa3"/>
+  <!-- White "S" flowing like a checkmark -->
+  <path d="M40 25 C40 20 33 17 27 19 C21 21 20 27 25 30 C29 32 36 33 37 37 C38 42 32 45 26 43 C23 42 21 40 21 38" stroke="#ffffff" stroke-width="5.5" stroke-linecap="round" fill="none"/>
 </svg>
