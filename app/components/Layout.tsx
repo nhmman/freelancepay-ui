@@ -34,7 +34,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         }}>
           {/* LEFT — Logo */}
           <Link href="/" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none", justifySelf: "start" }}>
-            <div style={{ width: 36, height: 36, background: "#0A0D12", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid #2A3545", flexShrink: 0 }}>
+            <div style={{ width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <Image src="/arcstation-logo.svg" alt="Statio" width={26} height={26} />
             </div>
             <span style={{ fontSize: 17, fontWeight: 800, color: "#0A1628", letterSpacing: "-0.3px", whiteSpace: "nowrap" }}>Statio</span>

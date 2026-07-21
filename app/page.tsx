@@ -47,7 +47,7 @@ export default function LandingPage() {
       {/* NAV */}
       <nav style={{ background: "white", borderBottom: "1px solid #E2EAF8", padding: "0 32px", height: 60, display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 50 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 32, height: 32, background: "#0A0D12", borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid #2A3545" }}>
+          <div style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center" }}>
             <Image src="/arcstation-logo.svg" alt="Statio" width={22} height={22} />
           </div>
           <span style={{ fontSize: 17, fontWeight: 800, color: "#0A1628", letterSpacing: "-0.3px" }}>Statio</span>
