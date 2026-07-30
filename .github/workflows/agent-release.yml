@@ -1,0 +1,77 @@
+name: Agent auto-release
+
+# Gọi /api/agent-release để agent tự giải ngân các escrow đã được duyệt.
+#
+# Vì sao là GitHub Actions chứ không phải Vercel Cron: project đang ở plan Hobby, mà
+# Hobby chỉ cho cron chạy 1 lần/ngày — không thể tôn trọng agent_release_at tính theo
+# phút. GH Actions cron sàn là 5 phút, nên escrow page đặt AGENT_DELAY_SECONDS = 6 phút
+# để một lần chạy theo lịch luôn rơi vào trong cửa sổ.
+#
+# Setup một lần (Settings → Secrets and variables → Actions):
+#   Secret  CRON_SECRET         phải TRÙNG với biến CRON_SECRET trong Vercel env
+#                               (production). Đây là thứ duy nhất chặn người lạ gọi
+#                               lệnh giải ngân, nên đừng để lộ.
+#   Variable AGENT_RELEASE_URL  (tuỳ chọn) ghi đè URL mặc định bên dưới.
+#
+# LƯU Ý VẬN HÀNH: GitHub chỉ chạy schedule trên nhánh mặc định (main). Nút
+# "Run workflow" cũng chỉ hiện khi file này đã có trên main. Nên tính năng này KHÔNG
+# demo được từ nhánh PR — phải merge vào main trước.
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"   # mỗi 5 phút — sàn của GH Actions. Repo public nên free.
+  workflow_dispatch: {}     # bấm tay lúc demo, không phải chờ cron
+
+# Không cần quyền gì với repo; chỉ gọi HTTP ra ngoài.
+permissions: {}
+
+# Nếu một lần chạy bị chậm, đừng để các lần sau xếp hàng đè nhau gọi release trùng.
+concurrency:
+  group: agent-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Gọi agent watcher
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          URL: ${{ vars.AGENT_RELEASE_URL || 'https://arcstation.xyz/api/agent-release' }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::Chưa set secret CRON_SECRET. Xem ghi chú setup ở đầu file workflow."
+            exit 1
+          fi
+
+          # Tách body và HTTP code. KHÔNG dùng curl -f: route trả 500 kèm JSON giải
+          # thích từng escrow lỗi, và cái JSON đó mới là thứ cần đọc trong log.
+          body=$(mktemp)
+          code=$(curl -sS -X POST \
+            -o "$body" -w "%{http_code}" \
+            --max-time 90 \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Content-Type: application/json" \
+            "$URL") || {
+              echo "::error::Không gọi được $URL (lỗi mạng hoặc timeout)."
+              exit 1
+            }
+
+          echo "HTTP $code"
+          echo "--- response ---"
+          cat "$body"; echo
+
+          if [ "$code" != "200" ]; then
+            echo "::error::Agent watcher trả HTTP $code — xem JSON ở trên, phần outcomes[].detail nói rõ escrow nào lỗi và vì sao."
+            exit 1
+          fi
+
+          # Không nuốt lỗi: 200 nhưng có DB_SYNC_FAILED_AFTER_TX là ca nguy hiểm nhất
+          # (tiền đã chuyển on-chain mà DB chưa ghi) — phải đỏ lên cho người biết.
+          if grep -q "DB_SYNC_FAILED_AFTER_TX" "$body"; then
+            echo "::error::Có escrow mà tx release đã thành công nhưng ghi DB thất bại. ĐỪNG chạy lại release bằng tay — tiền đã chuyển. Lần chạy sau sẽ tự đồng bộ DB."
+            exit 1
+          fi
+
+          echo "Agent watcher OK."
