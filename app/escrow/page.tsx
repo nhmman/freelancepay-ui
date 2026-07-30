@@ -11,6 +11,22 @@ import { REGISTRY_ADDRESS as REGISTRY, REGISTRY_ABI } from "../../lib/registry";
 const ZERO = "0x0000000000000000000000000000000000000000";
 const ARC_ID = 5042002;
 const ARBITER = "0x7ef0bc69160888ffb934619a6d595d0a8c0c9774";
+
+// ── Agent Pay MVP ────────────────────────────────────────────────────────────
+// The agent must BE the escrow's depositor: TimelockEscrow.release() only accepts
+// the depositor before the deadline (anyone may call it after) — see
+// lib/timelockEscrow.ts. We are not redeploying the contract, so the demo agent
+// funds the escrow itself. That constraint is what "an agent holding a wallet and
+// managing its own budget" reduces to here, not just framing.
+//
+// The signing wallet is a raw key in env for this MVP. The production path is to
+// extend the Circle Developer-Controlled Wallets integration that already runs in
+// app/api/milestones/release/route.ts from token sends to contract calls.
+const AGENT_WALLET = (process.env.NEXT_PUBLIC_AGENT_WALLET_ADDRESS ?? "").toLowerCase();
+// Wait between Approve and the agent's release. Must exceed GitHub Actions' ~5-minute
+// cron floor so a scheduled run can land inside the window, but stay short enough to
+// show live on stage.
+const AGENT_DELAY_SECONDS = 6 * 60;
 const M: React.CSSProperties = { fontFamily: "JetBrains Mono, IBM Plex Mono, monospace", fontWeight: 600 };
 const short = (a: string) => a ? a.slice(0, 6) + "..." + a.slice(-4) : "";
 
@@ -44,12 +60,17 @@ type Agreement = {
   tx_hash_fund: string | null;
   tx_hash_release: string | null;
   created_at: string;
+  // Optional: absent until the 20260730_agent_auto_release migration has run, so
+  // every read of these must tolerate undefined.
+  agent_auto_release?: boolean;
+  agent_release_at?: string | null;
 };
 
 const STATUS_STYLE: Record<string, { bg: string; color: string; label: string }> = {
   DRAFT:     { bg: "#FFFBEB", color: "#D97706", label: "Draft · not funded" },
   FUNDED:    { bg: "#EBF2FD", color: "#7FA8C9", label: "Funded · in progress" },
   SUBMITTED: { bg: "#FFFBEB", color: "#F59E0B", label: "Work submitted" },
+  APPROVED:  { bg: "#F5F3FF", color: "#7C3AED", label: "Approved · agent releasing" },
   RELEASED:  { bg: "#FFFFFF", color: "#2775CA", label: "Released ✓" },
   REFUNDED:  { bg: "#FFF5F5", color: "#DC2626", label: "Refunded" } };
 
@@ -75,6 +96,8 @@ export default function MilestonesPage() {
   const [deliverableEditId, setDeliverableEditId] = useState<string | null>(null);
   const [deliverableInput, setDeliverableInput] = useState("");
   const [deliverableError, setDeliverableError] = useState<string | null>(null);
+  const [autoRelease, setAutoRelease] = useState(false);
+  const [approvingId, setApprovingId] = useState<string | null>(null);
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -92,6 +115,10 @@ export default function MilestonesPage() {
     : (resolved && resolved !== ZERO ? (resolved as string) : null);
 
   const me = address?.toLowerCase() ?? "";
+  // Gate the toggle to the demo agent wallet. The auto-release path only works when
+  // the connected wallet is also the escrow's depositor, so exposing it to everyone
+  // would offer a switch that silently cannot deliver.
+  const isAgentWallet = !!AGENT_WALLET && me === AGENT_WALLET;
 
   const load = useCallback(async () => {
     if (!me) return;
@@ -116,13 +143,18 @@ export default function MilestonesPage() {
     if (!me || !beneficiaryAddress || !amount || !terms.trim()) return;
     setCreating(true);
     setCreateError(null);
+    const wantsAgent = isAgentWallet && autoRelease;
     const { error } = await supabase.from("escrow_agreements").insert({
       depositor_address: me,
       beneficiary_username: isDirectAddr ? short(bTrimmed) : slug,
       beneficiary_address: beneficiaryAddress.toLowerCase(),
       amount_usdc: parseFloat(amount),
       terms: terms.trim(),
-      status: "DRAFT" });
+      status: "DRAFT",
+      // Only send this column when the toggle is on. Leaving it out of the default
+      // payload means a database that hasn't run the migration yet still creates
+      // ordinary escrows, instead of every insert failing on "column does not exist".
+      ...(wantsAgent ? { agent_auto_release: true } : {}) });
     setCreating(false);
     if (error) {
       // Surface the failure instead of silently clearing the form — keeps the
@@ -130,7 +162,7 @@ export default function MilestonesPage() {
       setCreateError(`Couldn't create escrow — ${error.message}`);
       return;
     }
-    setBUsername(""); setAmount(""); setTerms("");
+    setBUsername(""); setAmount(""); setTerms(""); setAutoRelease(false);
     load();
   };
 
@@ -153,6 +185,17 @@ export default function MilestonesPage() {
     if (!res.ok) { setDeliverableError(res.error ?? "Invalid link"); return; }
     const ok = await setStatus(a.id, "SUBMITTED", { deliverable_url: res.url });
     if (ok) { setDeliverableEditId(null); setDeliverableInput(""); setDeliverableError(null); }
+  };
+
+  // Auto-release path: Approve only records the decision and the earliest release time,
+  // then hands off to the agent watcher (app/api/agent-release). It deliberately does
+  // NOT touch the contract — the point of the demo is that the release transaction is
+  // signed by the agent, not by this browser. setStatus already surfaces DB errors.
+  const approveForAgent = async (a: Agreement) => {
+    setApprovingId(a.id);
+    const releaseAt = new Date(Date.now() + AGENT_DELAY_SECONDS * 1000).toISOString();
+    await setStatus(a.id, "APPROVED", { agent_release_at: releaseAt });
+    setApprovingId(null);
   };
 
   // After a successful on-chain tx, persist the new status. The on-chain action is
@@ -312,6 +355,41 @@ export default function MilestonesPage() {
                   <input value={terms} onChange={e => setTerms(e.target.value)} placeholder="e.g. Deliver 3 logo concepts in PNG" />
                 </div>
               </div>
+              {isAgentWallet && (
+                <div style={{ background: autoRelease ? "#F5F3FF" : "#F4F7FD", border: `1px solid ${autoRelease ? "#7C3AED55" : "#E2EAF8"}`, borderRadius: 14, padding: "14px 16px", marginBottom: 14, transition: "all 0.18s" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <span style={{ fontSize: 20 }}>🤖</span>
+                      <div>
+                        <div style={{ fontSize: 15, fontWeight: 800, color: autoRelease ? "#7C3AED" : "#3B5878" }}>Auto-release via agent</div>
+                        <div style={{ ...M, fontSize: 13, color: "#6B8DB8", marginTop: 2 }}>Agent tự trả từng milestone ngay khi bạn duyệt</div>
+                      </div>
+                    </div>
+                    <button type="button" role="switch" aria-checked={autoRelease} aria-label="Auto-release via agent"
+                      onClick={() => setAutoRelease(v => !v)}
+                      style={{ flexShrink: 0, width: 46, height: 26, borderRadius: 99, border: "none", padding: 3,
+                        background: autoRelease ? "#7C3AED" : "#CBD5E8", cursor: "pointer", transition: "background 0.18s" }}>
+                      <span style={{ display: "block", width: 20, height: 20, borderRadius: "50%", background: "#FFFFFF",
+                        transform: autoRelease ? "translateX(20px)" : "translateX(0)", transition: "transform 0.18s" }} />
+                    </button>
+                  </div>
+                  {autoRelease && (
+                    <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #7C3AED22", display: "flex", flexDirection: "column", gap: 6 }}>
+                      {([
+                        ["Trần chi", amount ? `${amount} USDC` : "số tiền escrow này"],
+                        ["Thời gian chờ", `${AGENT_DELAY_SECONDS / 60} phút sau khi Approve`],
+                        ["Điều kiện", "chỉ release khi status = APPROVED"],
+                      ] as const).map(([k, v]) => (
+                        <div key={k} style={{ ...M, fontSize: 13, display: "flex", gap: 8, alignItems: "baseline" }}>
+                          <span style={{ color: "#7C3AED", flexShrink: 0 }}>▸</span>
+                          <span style={{ color: "#3B5878", minWidth: 116, flexShrink: 0 }}>{k}</span>
+                          <span style={{ color: "#0A1628" }}>{v}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
               <button onClick={createEscrow} disabled={!canCreate || creating}
                 style={{ width: "100%", padding: 14, borderRadius: 12, border: "none", fontSize: 15, fontWeight: 800,
                   background: canCreate && !creating ? "linear-gradient(135deg,#2775CA,#1855A0)" : "#EBF2FD",
@@ -385,8 +463,28 @@ export default function MilestonesPage() {
                           ) : null;
                         })()}
                         {dep && a.status === "SUBMITTED" && a.payment_id !== null && (
-                          <button onClick={() => releasePayment(a)} disabled={actingId === a.id} style={btnPrimary}>
-                            {actingId === a.id ? actStep || "Processing..." : "Approve & Release"}
+                          a.agent_auto_release ? (
+                            <button onClick={() => approveForAgent(a)} disabled={approvingId === a.id} style={btnAgent}>
+                              {approvingId === a.id ? "Approving..." : "🤖 Approve · agent sẽ trả"}
+                            </button>
+                          ) : (
+                            <button onClick={() => releasePayment(a)} disabled={actingId === a.id} style={btnPrimary}>
+                              {actingId === a.id ? actStep || "Processing..." : "Approve & Release"}
+                            </button>
+                          )
+                        )}
+
+                        {a.status === "APPROVED" && (
+                          <span style={{ ...M, fontSize: 14, color: "#7C3AED", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                            🤖 Agent releases at {a.agent_release_at ? new Date(a.agent_release_at).toLocaleTimeString() : "—"}
+                          </span>
+                        )}
+                        {/* Manual release stays available while APPROVED. Without this escape
+                            hatch, a watcher that never fires leaves the escrow stuck until the
+                            7-day deadline — too risky to rely on during a live demo. */}
+                        {dep && a.status === "APPROVED" && a.payment_id !== null && (
+                          <button onClick={() => releasePayment(a)} disabled={actingId === a.id} style={btnGhost}>
+                            {actingId === a.id ? actStep || "Processing..." : "Release now (manual fallback)"}
                           </button>
                         )}
 
@@ -442,4 +540,5 @@ export default function MilestonesPage() {
 
 const btnPrimary: React.CSSProperties = { padding: "10px 18px", borderRadius: 10, border: "none", background: "linear-gradient(135deg,#2775CA,#1855A0)", color: "#0A1628", fontSize: 15, fontWeight: 700, cursor: "pointer" };
 const btnGhost: React.CSSProperties = { padding: "10px 18px", borderRadius: 10, border: "1px solid #2A3830", background: "transparent", color: "#3B5878", fontWeight: 700, fontSize: 15, cursor: "pointer" };
+const btnAgent: React.CSSProperties = { padding: "10px 18px", borderRadius: 10, border: "none", background: "linear-gradient(135deg,#7C3AED,#5B21B6)", color: "#FFFFFF", fontSize: 15, fontWeight: 700, cursor: "pointer" };
 const btnDanger: React.CSSProperties = { padding: "10px 18px", borderRadius: 10, border: "1px solid #FECACA", background: "transparent", color: "#DC2626", fontSize: 15, fontWeight: 700, cursor: "pointer" };
