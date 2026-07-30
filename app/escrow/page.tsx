@@ -465,7 +465,7 @@ export default function MilestonesPage() {
                         {dep && a.status === "SUBMITTED" && a.payment_id !== null && (
                           a.agent_auto_release ? (
                             <button onClick={() => approveForAgent(a)} disabled={approvingId === a.id} style={btnAgent}>
-                              {approvingId === a.id ? "Approving..." : "🤖 Approve · agent sẽ trả"}
+                              {approvingId === a.id ? "Approving..." : "🤖 Approve · agent will pay"}
                             </button>
                           ) : (
                             <button onClick={() => releasePayment(a)} disabled={actingId === a.id} style={btnPrimary}>
