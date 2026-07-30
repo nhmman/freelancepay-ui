@@ -12,7 +12,7 @@
 // được). Route là POST và đòi CRON_SECRET — nếu không chặn thì bất kỳ ai cũng gọi được
 // lệnh giải ngân.
 import { type NextRequest } from "next/server";
-import { createPublicClient, createWalletClient, http } from "viem";
+import { createPublicClient, createWalletClient, http, parseAbiItem } from "viem";
 import { arcTestnet } from "viem/chains";
 import { privateKeyToAccount } from "viem/accounts";
 import { TIMELOCK_ADDRESS, TIMELOCK_ABI } from "../../../lib/timelockEscrow";
@@ -30,6 +30,16 @@ const CHAIN_RELEASED = 2;
 
 // Giới hạn mỗi lần chạy để không vượt maxDuration. Còn sót thì lần cron sau xử lý.
 const MAX_PER_RUN = 5;
+
+const RELEASED_EVENT = parseAbiItem("event EscrowReleased(uint256 indexed id, address indexed by)");
+
+// Cửa sổ tìm lại tx hash cho đường tự chữa. KHÔNG dùng fromBlock "earliest": chain đã
+// hơn 54 triệu block và RPC từ chối thẳng range đó. Arc block rất nhanh nên 5000 block
+// ~ hơn một tiếng, thừa sức phủ khoảng cách giữa lần ghi DB fail và lần cron kế tiếp.
+// Nếu để lệch lâu hơn thế thì mất link tx, nhưng status vẫn được chữa đúng.
+// BigInt(...) chứ không phải literal 5000n: tsconfig target là ES2017 nên literal BigInt
+// bị tsc từ chối — cùng lý do code sẵn có luôn viết BigInt(...).
+const HEAL_LOOKBACK_BLOCKS = BigInt(5000);
 
 type Result =
   | "released"              // agent ký tx thành công + DB đã cập nhật
@@ -117,12 +127,41 @@ export async function POST(request: NextRequest) {
 
     if (Number(chainStatus) === CHAIN_RELEASED) {
       // On-chain xong rồi, DB tụt lại. Chữa DB, không gửi tx.
+      //
+      // Trong đúng ca này (tx thành công nhưng ghi DB fail) thì tx hash đã mất theo
+      // lần chạy trước, nên tìm lại từ event EscrowReleased — không có nó thì escrow
+      // hiện là RELEASED mà không có link tx nào trên UI, mất luôn dấu vết on-chain.
+      // Tìm không ra cũng không sao: vẫn chữa status, chỉ thiếu link.
+      // RPC public của Arc fail lẻ tẻ nên thử lại vài lần; đây là phần "cho thêm",
+      // không được phép làm fail việc chữa status.
+      let healedHash: string | undefined;
+      for (let attempt = 0; attempt < 3 && !healedHash; attempt++) {
+        try {
+          const head = await publicClient.getBlockNumber();
+          const logs = await publicClient.getLogs({
+            address: TIMELOCK_ADDRESS, event: RELEASED_EVENT, args: { id: BigInt(paymentId) },
+            fromBlock: head > HEAL_LOOKBACK_BLOCKS ? head - HEAL_LOOKBACK_BLOCKS : BigInt(0),
+            toBlock: head,
+          });
+          healedHash = logs.at(-1)?.transactionHash;
+        } catch {
+          // thử lại
+        }
+      }
+
       const { error: syncErr } = await supabase.from("escrow_agreements")
-        .update({ status: "RELEASED", updated_at: new Date().toISOString() })
+        .update({
+          status: "RELEASED",
+          updated_at: new Date().toISOString(),
+          ...(healedHash ? { tx_hash_release: healedHash } : {}),
+        })
         .eq("id", row.id);
       outcomes.push(syncErr
         ? { id: row.id, payment_id: paymentId, result: "DB_SYNC_FAILED_AFTER_TX", detail: `On-chain đã Released nhưng vẫn không ghi được DB: ${syncErr.message}` }
-        : { id: row.id, payment_id: paymentId, result: "synced_already_onchain", detail: "On-chain đã Released trước đó, đã đồng bộ lại DB" });
+        : { id: row.id, payment_id: paymentId, result: "synced_already_onchain", tx_hash: healedHash,
+            detail: healedHash
+              ? "On-chain đã Released trước đó, đã đồng bộ lại DB và tìm lại được tx hash từ event"
+              : "On-chain đã Released trước đó, đã đồng bộ lại DB nhưng không tìm lại được tx hash (RPC lỗi) — escrow vẫn đúng trạng thái, chỉ thiếu link tx" });
       continue;
     }
 
