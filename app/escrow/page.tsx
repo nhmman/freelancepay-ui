@@ -362,7 +362,7 @@ export default function MilestonesPage() {
                       <span style={{ fontSize: 20 }}>🤖</span>
                       <div>
                         <div style={{ fontSize: 15, fontWeight: 800, color: autoRelease ? "#7C3AED" : "#3B5878" }}>Auto-release via agent</div>
-                        <div style={{ ...M, fontSize: 13, color: "#6B8DB8", marginTop: 2 }}>Agent tự trả từng milestone ngay khi bạn duyệt</div>
+                        <div style={{ ...M, fontSize: 13, color: "#6B8DB8", marginTop: 2 }}>Agent pays each milestone automatically once you approve</div>
                       </div>
                     </div>
                     <button type="button" role="switch" aria-checked={autoRelease} aria-label="Auto-release via agent"
@@ -376,9 +376,9 @@ export default function MilestonesPage() {
                   {autoRelease && (
                     <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid #7C3AED22", display: "flex", flexDirection: "column", gap: 6 }}>
                       {([
-                        ["Trần chi", amount ? `${amount} USDC` : "số tiền escrow này"],
-                        ["Thời gian chờ", `${AGENT_DELAY_SECONDS / 60} phút sau khi Approve`],
-                        ["Điều kiện", "chỉ release khi status = APPROVED"],
+                        ["Spending cap", amount ? `${amount} USDC` : "this escrow's amount"],
+                        ["Safety delay", `${AGENT_DELAY_SECONDS / 60} minutes after approval`],
+                        ["Condition", "release only when status = APPROVED"],
                       ] as const).map(([k, v]) => (
                         <div key={k} style={{ ...M, fontSize: 13, display: "flex", gap: 8, alignItems: "baseline" }}>
                           <span style={{ color: "#7C3AED", flexShrink: 0 }}>▸</span>
