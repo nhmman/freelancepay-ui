@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
   const secret = process.env.CRON_SECRET;
   if (!secret) {
     // Fail closed. Thiếu secret thì thà không chạy còn hơn chạy mà không ai chặn.
-    return Response.json({ ok: false, error: "CRON_SECRET chưa được cấu hình" }, { status: 500 });
+    return Response.json({ ok: false, error: "CRON_SECRET is not configured" }, { status: 500 });
   }
   if (request.headers.get("authorization") !== `Bearer ${secret}`) {
     return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
 
   const rawKey = process.env.AGENT_PRIVATE_KEY;
   if (!rawKey) {
-    return Response.json({ ok: false, error: "AGENT_PRIVATE_KEY chưa được cấu hình" }, { status: 500 });
+    return Response.json({ ok: false, error: "AGENT_PRIVATE_KEY is not configured" }, { status: 500 });
   }
 
   let account;
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
     account = privateKeyToAccount(rawKey.startsWith("0x") ? (rawKey as `0x${string}`) : (`0x${rawKey}` as `0x${string}`));
   } catch {
     // Không log key, chỉ nói là parse fail.
-    return Response.json({ ok: false, error: "AGENT_PRIVATE_KEY sai định dạng" }, { status: 500 });
+    return Response.json({ ok: false, error: "AGENT_PRIVATE_KEY is malformed" }, { status: 500 });
   }
 
   const publicClient = createPublicClient({ chain: arcTestnet, transport: http() });
@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
 
   if (queryError) {
     return Response.json(
-      { ok: false, error: `Không query được escrow đến hạn: ${queryError.message}` },
+      { ok: false, error: `Could not query escrows that are due: ${queryError.message}` },
       { status: 500 },
     );
   }
@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
     const paymentId = row.payment_id as number | null;
     if (paymentId === null || paymentId === undefined) {
       // Escrow được duyệt mà chưa từng fund on-chain — không có gì để release.
-      outcomes.push({ id: row.id, payment_id: null, result: "failed", detail: "payment_id rỗng, escrow chưa fund on-chain" });
+      outcomes.push({ id: row.id, payment_id: null, result: "failed", detail: "payment_id is empty — this escrow was never funded on-chain" });
       continue;
     }
 
@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
         address: TIMELOCK_ADDRESS, abi: TIMELOCK_ABI, functionName: "escrows", args: [BigInt(paymentId)],
       }) as readonly [string, string, bigint, bigint, number];
     } catch (e: any) {
-      outcomes.push({ id: row.id, payment_id: paymentId, result: "failed", detail: `Đọc escrow on-chain thất bại: ${e?.shortMessage || e?.message || "unknown"}` });
+      outcomes.push({ id: row.id, payment_id: paymentId, result: "failed", detail: `Failed to read the escrow on-chain: ${e?.shortMessage || e?.message || "unknown"}` });
       continue;
     }
 
@@ -157,16 +157,16 @@ export async function POST(request: NextRequest) {
         })
         .eq("id", row.id);
       outcomes.push(syncErr
-        ? { id: row.id, payment_id: paymentId, result: "DB_SYNC_FAILED_AFTER_TX", detail: `On-chain đã Released nhưng vẫn không ghi được DB: ${syncErr.message}` }
+        ? { id: row.id, payment_id: paymentId, result: "DB_SYNC_FAILED_AFTER_TX", detail: `Already Released on-chain but the database write still failed: ${syncErr.message}` }
         : { id: row.id, payment_id: paymentId, result: "synced_already_onchain", tx_hash: healedHash,
             detail: healedHash
-              ? "On-chain đã Released trước đó, đã đồng bộ lại DB và tìm lại được tx hash từ event"
-              : "On-chain đã Released trước đó, đã đồng bộ lại DB nhưng không tìm lại được tx hash (RPC lỗi) — escrow vẫn đúng trạng thái, chỉ thiếu link tx" });
+              ? "Already Released on-chain; database re-synced and the tx hash recovered from the event"
+              : "Already Released on-chain; database re-synced, but the tx hash could not be recovered (RPC failure) — the escrow status is correct, only the tx link is missing" });
       continue;
     }
 
     if (Number(chainStatus) !== CHAIN_FUNDED) {
-      outcomes.push({ id: row.id, payment_id: paymentId, result: "failed", detail: `Status on-chain = ${Number(chainStatus)} (cần ${CHAIN_FUNDED}=Funded). Có thể đã refund.` });
+      outcomes.push({ id: row.id, payment_id: paymentId, result: "failed", detail: `On-chain status = ${Number(chainStatus)} (expected ${CHAIN_FUNDED}=Funded). It may have been refunded.` });
       continue;
     }
 
@@ -175,7 +175,7 @@ export async function POST(request: NextRequest) {
       // Nói thẳng ra thay vì để tốn gas rồi nhận lỗi mù.
       outcomes.push({
         id: row.id, payment_id: paymentId, result: "failed",
-        detail: `Ví agent (${account.address}) không phải depositor của escrow này (${depositor}). release() chỉ cho depositor gọi trước deadline — escrow này phải do chính ví agent fund.`,
+        detail: `The agent wallet (${account.address}) is not this escrow's depositor (${depositor}). release() only accepts the depositor before the deadline — this escrow must be funded by the agent wallet itself.`,
       });
       continue;
     }
@@ -187,20 +187,20 @@ export async function POST(request: NextRequest) {
         address: TIMELOCK_ADDRESS, abi: TIMELOCK_ABI, functionName: "release", args: [BigInt(paymentId)],
       });
     } catch (e: any) {
-      outcomes.push({ id: row.id, payment_id: paymentId, result: "failed", detail: `Gửi release() thất bại: ${e?.shortMessage || e?.message || "unknown"}` });
+      outcomes.push({ id: row.id, payment_id: paymentId, result: "failed", detail: `Sending release() failed: ${e?.shortMessage || e?.message || "unknown"}` });
       continue;
     }
 
     try {
       const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
       if (receipt.status !== "success") {
-        outcomes.push({ id: row.id, payment_id: paymentId, result: "failed", tx_hash: txHash, detail: "Tx bị revert on-chain, DB giữ nguyên APPROVED" });
+        outcomes.push({ id: row.id, payment_id: paymentId, result: "failed", tx_hash: txHash, detail: "Tx reverted on-chain; the database stays at APPROVED" });
         continue;
       }
     } catch (e: any) {
       // Không rõ tx thành công hay chưa → KHÔNG ghi DB. Lần chạy sau tiền kiểm sẽ
       // thấy status on-chain và tự chữa, nên không có nguy cơ trả tiền hai lần.
-      outcomes.push({ id: row.id, payment_id: paymentId, result: "failed", tx_hash: txHash, detail: `Không lấy được receipt: ${e?.shortMessage || e?.message || "unknown"}. Lần chạy sau sẽ tự đối chiếu on-chain.` });
+      outcomes.push({ id: row.id, payment_id: paymentId, result: "failed", tx_hash: txHash, detail: `Could not fetch the receipt: ${e?.shortMessage || e?.message || "unknown"}. The next run will reconcile against on-chain state.` });
       continue;
     }
 
@@ -213,7 +213,7 @@ export async function POST(request: NextRequest) {
       // chuyển. Không được im lặng. Kêu to để run của GitHub Actions đỏ lên.
       outcomes.push({
         id: row.id, payment_id: paymentId, result: "DB_SYNC_FAILED_AFTER_TX", tx_hash: txHash,
-        detail: `Tx release ĐÃ thành công và là FINAL (${txHash}) nhưng ghi DB thất bại: ${updateErr.message}. KHÔNG chạy lại release — tiền đã chuyển. Lần chạy sau sẽ tự đồng bộ DB.`,
+        detail: `The release tx SUCCEEDED and is FINAL (${txHash}) but the database write failed: ${updateErr.message}. Do NOT re-run release — the funds already moved. The next run will re-sync the database.`,
       });
       continue;
     }

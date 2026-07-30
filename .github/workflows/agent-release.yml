@@ -41,7 +41,7 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${CRON_SECRET:-}" ]; then
-            echo "::error::Chưa set secret CRON_SECRET. Xem ghi chú setup ở đầu file workflow."
+            echo "::error::Secret CRON_SECRET is not set. See the setup note at the top of this workflow."
             exit 1
           fi
 
@@ -54,7 +54,7 @@ jobs:
             -H "Authorization: Bearer ${CRON_SECRET}" \
             -H "Content-Type: application/json" \
             "$URL") || {
-              echo "::error::Không gọi được $URL (lỗi mạng hoặc timeout)."
+              echo "::error::Could not reach $URL (network error or timeout)."
               exit 1
             }
 
@@ -63,14 +63,14 @@ jobs:
           cat "$body"; echo
 
           if [ "$code" != "200" ]; then
-            echo "::error::Agent watcher trả HTTP $code — xem JSON ở trên, phần outcomes[].detail nói rõ escrow nào lỗi và vì sao."
+            echo "::error::Agent watcher returned HTTP $code — see the JSON above; outcomes[].detail says which escrow failed and why."
             exit 1
           fi
 
           # Không nuốt lỗi: 200 nhưng có DB_SYNC_FAILED_AFTER_TX là ca nguy hiểm nhất
           # (tiền đã chuyển on-chain mà DB chưa ghi) — phải đỏ lên cho người biết.
           if grep -q "DB_SYNC_FAILED_AFTER_TX" "$body"; then
-            echo "::error::Có escrow mà tx release đã thành công nhưng ghi DB thất bại. ĐỪNG chạy lại release bằng tay — tiền đã chuyển. Lần chạy sau sẽ tự đồng bộ DB."
+            echo "::error::An escrow's release tx succeeded but the database write failed. Do NOT re-run release by hand — the funds already moved. The next run will re-sync the database."
             exit 1
           fi
 
