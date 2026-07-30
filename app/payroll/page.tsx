@@ -343,6 +343,11 @@ export default function Home() {
                   + Add
                 </button>
               </div>
+              {/* Dưới cả hàng grid, không nhét trong ô WALLET — hàng dùng alignItems:"end"
+                  nên thêm dòng vào ô đó sẽ đẩy input lệch khỏi các ô khác. Chữ giống trang Tip. */}
+              {newWallet && !isAddress(newWallet) && (
+                <div style={{ fontSize:13, color:C.red, marginTop:10 }}>✗ Invalid address</div>
+              )}
             </div>
 
             <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
