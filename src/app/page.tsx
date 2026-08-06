@@ -130,7 +130,7 @@ export default function Home() {
         <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:10, marginBottom:28 }}>
           {[
             ["Agent ID", "15994", "#7FB99A", "Agent Identity"],
-            ["Reputation", "95/100", "#7FA8C9", "On-chain ✓"],
+            ["Reputation", "95/100", "#7FA8C9", "Simulated"],
             ["Finality", "< 1s", "#C4CFBE", "Arc Testnet"],
           ].map(([l,v,c,sub]) => (
             <div key={l} style={{ background:"#111813", border:"1px solid #1E2820", borderRadius:12, padding:"14px 16px" }}>

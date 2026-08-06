@@ -245,7 +245,7 @@ export default function Home() {
         {/* STATS */}
         {mounted && isConnected && (
           <div className="pop" style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:10, marginBottom:28 }}>
-            {([["Agent ID",agentId,"Agent Identity","#2775CA"],["Reputation","95/100","Expert Tier ⭐","#2775CA"],["Network",onArc?"Arc ✓":"Wrong Network",onArc?"Testnet · 5042002":"Switch!",onArc?"#C4CFBE":"#DC2626"],["Wallet",short(address!),"Connected ✓","#6B8DB8"]] as const).map(([l,v,sub,c])=>(
+            {([["Agent ID",agentId,"Agent Identity","#2775CA"],["Reputation","95/100","Expert Tier · Simulated","#2775CA"],["Network",onArc?"Arc ✓":"Wrong Network",onArc?"Testnet · 5042002":"Switch!",onArc?"#C4CFBE":"#DC2626"],["Wallet",short(address!),"Connected ✓","#6B8DB8"]] as const).map(([l,v,sub,c])=>(
               <div key={l} style={{ background:"#FFFFFF", border:`1px solid ${l==="Network"&&!onArc?"#DC262633":"#E2EAF8"}`, borderRadius:14, padding:"16px 18px" }}>
                 <div style={{ ...M, fontSize:12, color:"#9BB5C8", marginBottom:8 }}>{l}</div>
                 <div style={{ fontSize:20, fontWeight:800, color:c, marginBottom:4 }}>{v}</div>

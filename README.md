@@ -5,7 +5,7 @@
 **Live Demo:** https://freelancepay-ui.vercel.app  
 **GitHub:** https://github.com/nhmman/freelancepay-ui  
 **Agent ID:** 15994  
-**Reputation:** 95/100 (Expert Tier)
+**Reputation:** 95/100 (Expert Tier) — *simulated, see [note](#reputation-scoring-status)*
 
 ---
 
@@ -36,12 +36,24 @@ FreelancePay is an AI Payment Agent that automates escrow and milestone payouts 
 ## Tech Stack
 
 - **Blockchain:** Arc Testnet (Chain ID: 5042002)
-- **Identity:** Agent ID 15994 (Score: 95/100)
+- **Identity:** Agent ID 15994 (Score: 95/100 — simulated, see [note](#reputation-scoring-status))
 - **Commerce:** Smart job contracts on Arc Testnet
 - **Payments:** Circle Developer Controlled Wallets
 - **SDK:** Arc App Kit (Send, Swap, Bridge, Unified Balance)
 - **Frontend:** Next.js 16 + Tailwind CSS
 - **AI:** Claude Sonnet (Invoice generation)
+
+### Reputation scoring status
+
+Reputation scoring is **simulated** in the current build. `app/api/reputation/route.ts`
+returns scores from a hardcoded map (`15994 → 95`, `1 → 30`, `100 → 65`) and falls back
+to a random value for any other agent ID. It does not read an on-chain reputation
+registry, and `app/api/reputation/pay/route.ts` does not write a score anywhere — it
+only transfers USDC at the bonus-adjusted amount.
+
+The score-based payout tiers themselves are real: the bonus is computed and the USDC
+transfer executes on Arc Testnet. Only the *source* of the score is stubbed, pending a
+registry to read from.
 
 ---
 
