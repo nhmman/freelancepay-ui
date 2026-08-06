@@ -3,7 +3,6 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { useAccount } from "wagmi";
 
 const NAV_ITEMS = [
   { href: "/pay",     label: "Pay" },
@@ -15,8 +14,6 @@ const NAV_ITEMS = [
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { address, isConnected } = useAccount();
-  const agentId = isConnected && address ? "#"+address.slice(2,7).toUpperCase() : "#——";
 
   return (
     <div style={{ minHeight: "100vh", background: "#F4F7FD", color: "#0A1628", fontFamily: "Inter, -apple-system, sans-serif" }}>
@@ -60,14 +57,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             })}
           </div>
 
-          {/* RIGHT — Agent + Wallet */}
+          {/* RIGHT — Wallet */}
           <div style={{ display: "flex", alignItems: "center", gap: 8, justifySelf: "end" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, background: "#EBF2FD", border: "1px solid #C5D9F5", borderRadius: 10, padding: "5px 12px" }}>
-              <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#2775CA" }} />
-              <span style={{ fontSize: 12, fontWeight: 600, color: "#2775CA", fontFamily: "JetBrains Mono, monospace" }} suppressHydrationWarning>
-                Agent {agentId}
-              </span>
-            </div>
             <ConnectButton label="Connect" accountStatus="avatar" showBalance={false} chainStatus="none" />
           </div>
         </div>
