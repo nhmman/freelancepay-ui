@@ -116,7 +116,7 @@ export default function Home() {
         {/* HEADER */}
         <div style={{ marginBottom:32 }}>
           <div style={{ fontFamily:"IBM Plex Mono, monospace", fontSize:10, color:"#7FB99A", letterSpacing:"0.14em", marginBottom:12 }}>
-            ERC-8183 ESCROW · CIRCLE USDC
+            TIMELOCK ESCROW · CIRCLE USDC
           </div>
           <h1 style={{ fontSize:28, fontWeight:800, letterSpacing:"-0.8px", color:"#E8EDE9", marginBottom:8 }}>
             Release Milestone Payment
@@ -129,7 +129,7 @@ export default function Home() {
         {/* STATS */}
         <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:10, marginBottom:28 }}>
           {[
-            ["Agent ID", "15994", "#7FB99A", "ERC-8004 ✓"],
+            ["Agent ID", "15994", "#7FB99A", "Agent Identity"],
             ["Reputation", "95/100", "#7FA8C9", "On-chain ✓"],
             ["Finality", "< 1s", "#C4CFBE", "Arc Testnet"],
           ].map(([l,v,c,sub]) => (
@@ -301,7 +301,7 @@ export default function Home() {
 
         {/* FOOTER */}
         <div style={{ marginTop:40, textAlign:"center", fontFamily:"IBM Plex Mono, monospace", fontSize:11, color:"#4A6A5A" }}>
-          FreelancePay · Statio · Arc Testnet · ERC-8004 · ERC-8183
+          FreelancePay · Statio · Arc Testnet · USDC Native Gas
         </div>
 
       </div>

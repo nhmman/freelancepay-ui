@@ -19,8 +19,8 @@ const USDC_ABI = [{ name:"transfer", type:"function", stateMutability:"nonpayabl
 const FEATURES = [
   { href:"/escrow", icon:"📋", title:"Multi-Milestone Escrow", tag:"ESCROW"   },
   { href:"/nanopay",    icon:"⚡", title:"Nanopayments x402",      tag:"x402"     },
-  { href:"/reputation", icon:"⭐", title:"Reputation Pricing",     tag:"ERC-8004" },
-  { href:"/jobs",       icon:"🤖", title:"Smart Jobs",             tag:"ERC-8183" },
+  { href:"/reputation", icon:"⭐", title:"Reputation Pricing",     tag:"Scoring"  },
+  { href:"/jobs",       icon:"🤖", title:"Smart Jobs",             tag:"Arc Testnet" },
   { href:"/invoice",    icon:"🧾", title:"AI Invoice",             tag:"AI"       },
   { href:"/portfolio",  icon:"📊", title:"Portfolio & FX",         tag:"FX"       },
 ];
@@ -146,7 +146,7 @@ export default function Home() {
         {/* HERO */}
         <div style={{ textAlign:"center", marginBottom:40 }}>
           <div style={{ display:"inline-flex", alignItems:"center", gap:8, background:"#EBF2FD", border:"1px solid #2775CA33", borderRadius:99, padding:"6px 18px", fontSize:13, color:"#2775CA", ...M, marginBottom:20 }}>
-            BUILT ON ARC · ERC-8004 · CIRCLE USDC
+            BUILT ON ARC · USDC NATIVE GAS · CIRCLE USDC
           </div>
           <h1 style={{ fontSize:52, fontWeight:900, letterSpacing:"-2px", lineHeight:1.05, color:"#0A1628", marginBottom:14 }}>
             Get Paid in USDC.<br/>
@@ -245,7 +245,7 @@ export default function Home() {
         {/* STATS */}
         {mounted && isConnected && (
           <div className="pop" style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:10, marginBottom:28 }}>
-            {([["Agent ID",agentId,"ERC-8004 Identity","#2775CA"],["Reputation","95/100","Expert Tier ⭐","#2775CA"],["Network",onArc?"Arc ✓":"Wrong Network",onArc?"Testnet · 5042002":"Switch!",onArc?"#C4CFBE":"#DC2626"],["Wallet",short(address!),"Connected ✓","#6B8DB8"]] as const).map(([l,v,sub,c])=>(
+            {([["Agent ID",agentId,"Agent Identity","#2775CA"],["Reputation","95/100","Expert Tier ⭐","#2775CA"],["Network",onArc?"Arc ✓":"Wrong Network",onArc?"Testnet · 5042002":"Switch!",onArc?"#C4CFBE":"#DC2626"],["Wallet",short(address!),"Connected ✓","#6B8DB8"]] as const).map(([l,v,sub,c])=>(
               <div key={l} style={{ background:"#FFFFFF", border:`1px solid ${l==="Network"&&!onArc?"#DC262633":"#E2EAF8"}`, borderRadius:14, padding:"16px 18px" }}>
                 <div style={{ ...M, fontSize:12, color:"#9BB5C8", marginBottom:8 }}>{l}</div>
                 <div style={{ fontSize:20, fontWeight:800, color:c, marginBottom:4 }}>{v}</div>
@@ -353,7 +353,7 @@ export default function Home() {
           </div>
         </div>
         <div style={{ ...M, fontSize:12, color:"#C5D9F5", textAlign:"center" as const }}>
-          Statio · Arc Testnet · Circle USDC · ERC-8004 · ERC-8183
+          Statio · Arc Testnet · Circle USDC · USDC Native Gas
         </div>
       </div>
     </Layout>

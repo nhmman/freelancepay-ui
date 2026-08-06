@@ -1,17 +1,17 @@
 # FreelancePay — AI Payment Agent on Arc
 
-> The payment layer for 2 million Vietnamese freelancers. Built on Arc + ERC-8004 + Circle USDC.
+> The payment layer for 2 million Vietnamese freelancers. Built on Arc + Circle USDC.
 
 **Live Demo:** https://freelancepay-ui.vercel.app  
 **GitHub:** https://github.com/nhmman/freelancepay-ui  
-**Agent ID:** 15994 (ERC-8004)  
+**Agent ID:** 15994  
 **Reputation:** 95/100 (Expert Tier)
 
 ---
 
 ## What is FreelancePay?
 
-FreelancePay is an AI Payment Agent that automates escrow and milestone payouts for freelancers — built natively on Arc Testnet using ERC-8004 identity, ERC-8183 smart job contracts, and Circle Developer Wallets.
+FreelancePay is an AI Payment Agent that automates escrow and milestone payouts for freelancers — built natively on Arc Testnet using Circle Developer Wallets and USDC-native settlement.
 
 **The problem:** Vietnam has 2M+ freelancers facing PayPal freezes, 20% Upwork fees, and no trusted escrow for international clients.
 
@@ -26,8 +26,8 @@ FreelancePay is an AI Payment Agent that automates escrow and milestone payouts 
 | **Quick Send** | Direct USDC transfer to freelancer | Circle App Kit |
 | **Multi-Milestone Escrow** | Project-based escrow with per-milestone release | Circle Wallets |
 | **Nanopayments** | Pay-per-use API calls (0.001-0.01 USDC/call) | Arc x402 |
-| **Reputation Pricing** | Score-based payment tiers (+20%/+50% bonus) | ERC-8004 |
-| **Smart Job Contracts** | Full job lifecycle: Open→Funded→Submitted→Completed | ERC-8183 |
+| **Reputation Pricing** | Score-based payment tiers (+20%/+50% bonus) | App logic |
+| **Smart Job Contracts** | Full job lifecycle: Open→Funded→Submitted→Completed | Arc Testnet contract |
 | **AI Invoice Generator** | Describe work → AI creates invoice → instant payment | Claude AI |
 | **Portfolio Dashboard** | Multi-currency USDC+EURC with VND conversion | Arc FX |
 
@@ -36,8 +36,8 @@ FreelancePay is an AI Payment Agent that automates escrow and milestone payouts 
 ## Tech Stack
 
 - **Blockchain:** Arc Testnet (Chain ID: 5042002)
-- **Identity:** ERC-8004 (Agent ID: 15994, Score: 95/100)
-- **Commerce:** ERC-8183 Smart Job Contracts
+- **Identity:** Agent ID 15994 (Score: 95/100)
+- **Commerce:** Smart job contracts on Arc Testnet
 - **Payments:** Circle Developer Controlled Wallets
 - **SDK:** Arc App Kit (Send, Swap, Bridge, Unified Balance)
 - **Frontend:** Next.js 16 + Tailwind CSS
@@ -49,7 +49,7 @@ FreelancePay is an AI Payment Agent that automates escrow and milestone payouts 
 
 | Action | TX Hash |
 |--------|---------|
-| ERC-8004 Identity | `0x352df22241fcb83d5495bb332d71d28566bf711239b851e11f1e57b5cbad9e9d` |
+| Agent Identity | `0x352df22241fcb83d5495bb332d71d28566bf711239b851e11f1e57b5cbad9e9d` |
 | Reputation (95/100) | `0x30595f699b69b133461867e68a71dd20d9722a3a4444aaa2692c6b2f4187fc3b` |
 | App Kit Send | `0xebd53bd965051b8cba4fd04554b9f704915276c8981c984a3c37bbd7314b5f01` |
 | App Kit Swap | `0x2e12fde67d0b578f0186b9622e994f37bdd22758600f861e6806f2a4a747105d` |
@@ -103,6 +103,6 @@ npm run dev
 ## Hackathon Tracks
 
 - **Track 1:** Cross-Border Payments — freelancer payouts from international clients
-- **Track 4:** Agentic Economy — AI agent with ERC-8004 identity executing autonomous payments
+- **Track 4:** Agentic Economy — AI agent with on-chain identity executing autonomous payments
 
 *Built for the Stablecoins Commerce Stack Challenge by Leo (Manh) — Vietnam*
