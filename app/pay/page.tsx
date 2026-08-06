@@ -85,9 +85,6 @@ export default function Home() {
   :                               "Unavailable";
 
   const onArc   = chainId === ARC_ID;
-  // Per-wallet display handle for the connected visitor's own pay link. This is a
-  // cosmetic string derived from the address — it is NOT an ERC-8004 agent id.
-  const agentId = isConnected && address ? "#"+address.slice(2,7).toUpperCase() : "—";
 
   const claimSlug = inputUsername.trim().toLowerCase().replace(/[^a-z0-9_]/g, "");
   const claimValid = claimSlug.length >= 2 && claimSlug.length <= 30;
@@ -230,7 +227,7 @@ export default function Home() {
                     </span>
                   </div>
                   <div style={{ ...M, fontSize:12, color:"#9BB5C8", marginTop:8 }}>
-                    {onChainUsername ? `Username: ${onChainUsername} · ` : "Wallet address · "}Agent {agentId}
+                    {onChainUsername ? `Username: ${onChainUsername}` : "Wallet address"}
                   </div>
                 </div>
 
