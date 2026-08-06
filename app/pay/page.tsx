@@ -16,8 +16,13 @@ const M: React.CSSProperties = { fontFamily:"IBM Plex Mono,monospace" };
 
 const USDC_ABI = [{ name:"transfer", type:"function", stateMutability:"nonpayable", inputs:[{name:"to",type:"address"},{name:"amount",type:"uint256"}], outputs:[{name:"",type:"bool"}] }] as const;
 
-// Agent identity registered in the ERC-8004 IdentityRegistry; its feedback lives in
-// the ReputationRegistry at 0x8004B663056A597Dffe9eCcC1965A193B7388713.
+// The single agent this app represents. Registered in the ERC-8004 IdentityRegistry
+// at 0x8004A818BFB912233c491871b3d84c89A494BD9e (ownerOf(15994) ==
+// 0x93C8DC4755580A3820e564D89caa273773515c8D); its feedback lives in the
+// ReputationRegistry at 0x8004B663056A597Dffe9eCcC1965A193B7388713.
+// Hardcoded because there is exactly one agent — it is deliberately not derived from
+// the connected wallet, so the "Agent ID" and "Reputation" cards describe the same
+// entity. If the app ever represents multiple agents this needs a real lookup.
 const ERC8004_AGENT_ID = "15994";
 
 type Rep =
@@ -80,6 +85,8 @@ export default function Home() {
   :                               "Unavailable";
 
   const onArc   = chainId === ARC_ID;
+  // Per-wallet display handle for the connected visitor's own pay link. This is a
+  // cosmetic string derived from the address — it is NOT an ERC-8004 agent id.
   const agentId = isConnected && address ? "#"+address.slice(2,7).toUpperCase() : "—";
 
   const claimSlug = inputUsername.trim().toLowerCase().replace(/[^a-z0-9_]/g, "");
@@ -286,7 +293,7 @@ export default function Home() {
         {/* STATS */}
         {mounted && isConnected && (
           <div className="pop" style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:10, marginBottom:28 }}>
-            {([["Agent ID",agentId,"Agent Identity","#2775CA"],["Reputation",repValue,repSub,"#2775CA"],["Network",onArc?"Arc ✓":"Wrong Network",onArc?"Testnet · 5042002":"Switch!",onArc?"#C4CFBE":"#DC2626"],["Wallet",short(address!),"Connected ✓","#6B8DB8"]] as const).map(([l,v,sub,c])=>(
+            {([["Agent ID",ERC8004_AGENT_ID,"ERC-8004 Agent","#2775CA"],["Reputation",repValue,repSub,"#2775CA"],["Network",onArc?"Arc ✓":"Wrong Network",onArc?"Testnet · 5042002":"Switch!",onArc?"#C4CFBE":"#DC2626"],["Wallet",short(address!),"Connected ✓","#6B8DB8"]] as const).map(([l,v,sub,c])=>(
               <div key={l} style={{ background:"#FFFFFF", border:`1px solid ${l==="Network"&&!onArc?"#DC262633":"#E2EAF8"}`, borderRadius:14, padding:"16px 18px" }}>
                 <div style={{ ...M, fontSize:12, color:"#9BB5C8", marginBottom:8 }}>{l}</div>
                 <div style={{ fontSize:20, fontWeight:800, color:c, marginBottom:4 }}>{v}</div>
