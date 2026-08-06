@@ -16,6 +16,16 @@ const M: React.CSSProperties = { fontFamily:"IBM Plex Mono,monospace" };
 
 const USDC_ABI = [{ name:"transfer", type:"function", stateMutability:"nonpayable", inputs:[{name:"to",type:"address"},{name:"amount",type:"uint256"}], outputs:[{name:"",type:"bool"}] }] as const;
 
+// Agent identity registered in the ERC-8004 IdentityRegistry; its feedback lives in
+// the ReputationRegistry at 0x8004B663056A597Dffe9eCcC1965A193B7388713.
+const ERC8004_AGENT_ID = "15994";
+
+type Rep =
+  | { state: "loading" }
+  | { state: "on-chain"; score: number; partial: boolean }
+  | { state: "none" }
+  | { state: "unavailable" };
+
 const FEATURES = [
   { href:"/escrow", icon:"📋", title:"Multi-Milestone Escrow", tag:"ESCROW"   },
   { href:"/nanopay",    icon:"⚡", title:"Nanopayments x402",      tag:"x402"     },
@@ -37,6 +47,37 @@ export default function Home() {
   const [mounted, setMounted]     = useState(false);
 
   useEffect(() => { setMounted(true); }, []);
+
+  // Agent reputation, read from the canonical ERC-8004 ReputationRegistry via
+  // /api/reputation. Never falls back to a hardcoded score: if the read does not
+  // come back as source "on-chain", the card shows no number at all.
+  const [rep, setRep] = useState<Rep>({ state: "loading" });
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/reputation?agentId=${ERC8004_AGENT_ID}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (cancelled) return;
+        if (d?.source === "on-chain" && typeof d.score === "number") {
+          setRep({ state: "on-chain", score: d.score, partial: !!d.partial });
+        } else if (d?.source === "none") {
+          setRep({ state: "none" });
+        } else {
+          setRep({ state: "unavailable" });
+        }
+      })
+      .catch(() => { if (!cancelled) setRep({ state: "unavailable" }); });
+    return () => { cancelled = true; };
+  }, []);
+
+  // "ERC-8004 ✓" is derived from the fetch result, never hardcoded — it cannot
+  // render unless the registry read actually succeeded.
+  const repValue = rep.state === "on-chain" ? String(rep.score) : rep.state === "loading" ? "···" : "—";
+  const repSub =
+    rep.state === "loading"     ? "Reading registry…"
+  : rep.state === "on-chain"    ? (rep.partial ? "ERC-8004 ✓ · partial" : "ERC-8004 ✓")
+  : rep.state === "none"        ? "No feedback yet"
+  :                               "Unavailable";
 
   const onArc   = chainId === ARC_ID;
   const agentId = isConnected && address ? "#"+address.slice(2,7).toUpperCase() : "—";
@@ -245,7 +286,7 @@ export default function Home() {
         {/* STATS */}
         {mounted && isConnected && (
           <div className="pop" style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:10, marginBottom:28 }}>
-            {([["Agent ID",agentId,"Agent Identity","#2775CA"],["Reputation","95/100","Expert Tier · Simulated","#2775CA"],["Network",onArc?"Arc ✓":"Wrong Network",onArc?"Testnet · 5042002":"Switch!",onArc?"#C4CFBE":"#DC2626"],["Wallet",short(address!),"Connected ✓","#6B8DB8"]] as const).map(([l,v,sub,c])=>(
+            {([["Agent ID",agentId,"Agent Identity","#2775CA"],["Reputation",repValue,repSub,"#2775CA"],["Network",onArc?"Arc ✓":"Wrong Network",onArc?"Testnet · 5042002":"Switch!",onArc?"#C4CFBE":"#DC2626"],["Wallet",short(address!),"Connected ✓","#6B8DB8"]] as const).map(([l,v,sub,c])=>(
               <div key={l} style={{ background:"#FFFFFF", border:`1px solid ${l==="Network"&&!onArc?"#DC262633":"#E2EAF8"}`, borderRadius:14, padding:"16px 18px" }}>
                 <div style={{ ...M, fontSize:12, color:"#9BB5C8", marginBottom:8 }}>{l}</div>
                 <div style={{ fontSize:20, fontWeight:800, color:c, marginBottom:4 }}>{v}</div>

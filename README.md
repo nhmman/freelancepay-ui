@@ -36,7 +36,8 @@ FreelancePay is an AI Payment Agent that automates escrow and milestone payouts 
 ## Tech Stack
 
 - **Blockchain:** Arc Testnet (Chain ID: 5042002)
-- **Identity:** Agent ID 15994 (Score: 95/100 — simulated, see [note](#reputation-scoring-status))
+- **Identity:** Agent ID 15994 (Score: 95 — on-chain, see [note](#reputation-scoring-status))
+- **Reputation:** ERC-8004 ReputationRegistry `0x8004B663056A597Dffe9eCcC1965A193B7388713`
 - **Commerce:** Smart job contracts on Arc Testnet
 - **Payments:** Circle Developer Controlled Wallets
 - **SDK:** Arc App Kit (Send, Swap, Bridge, Unified Balance)
@@ -45,15 +46,36 @@ FreelancePay is an AI Payment Agent that automates escrow and milestone payouts 
 
 ### Reputation scoring status
 
-Reputation scoring is **simulated** in the current build. `app/api/reputation/route.ts`
-returns scores from a hardcoded map (`15994 → 95`, `1 → 30`, `100 → 65`) and falls back
-to a random value for any other agent ID. It does not read an on-chain reputation
-registry, and `app/api/reputation/pay/route.ts` does not write a score anywhere — it
-only transfers USDC at the bonus-adjusted amount.
+The score for agent 15994 is **written on-chain**. It was recorded on Arc Testnet via
+`giveFeedback(...)` on the canonical ERC-8004 ReputationRegistry at
+`0x8004B663056A597Dffe9eCcC1965A193B7388713` (an ERC-1967 proxy, `getVersion() == "2.0.0"`),
+with `value = 95`, `valueDecimals = 0`, tags `"milestone_completed"` and
+`"UI Design delivered on time"`. It is still readable today via
+`readFeedback(15994, 0x8b0e1414…, 1)`.
 
-The score-based payout tiers themselves are real: the bonus is computed and the USDC
-transfer executes on Arc Testnet. Only the *source* of the score is stubbed, pending a
-registry to read from.
+`app/api/reputation/route.ts` reads that registry directly — `getClients(agentId)` followed
+by `getSummary(...)`, which averages non-revoked feedback on-chain. Agents with no feedback
+return `score: null, source: "none"`; the route never invents a number. If the RPC is
+unreachable it returns `source: "unavailable"` rather than failing the request.
+
+The reputation stat card on `/pay` reads this route on mount. Its `ERC-8004 ✓` label is
+derived from the response, not hardcoded — if the read returns `none` or `unavailable`, the
+card shows no number at all rather than falling back to a literal. A partial read (see
+below) is labelled `ERC-8004 ✓ · partial`.
+
+Two caveats, so the numbers are not oversold:
+
+- `getSummary` iterates every feedback of every client passed to it, so agents with a very
+  large history can exceed the RPC's `eth_call` gas cap. The route bisects on revert, skips
+  clients it cannot read, and stops at an 8s deadline — reporting `partial: true` when the
+  average covers only part of the feedback.
+- `app/api/reputation/pay/route.ts` does not write a score anywhere — it only transfers USDC
+  at the bonus-adjusted amount. The payout tiers themselves are real: the bonus is computed
+  and the USDC transfer executes on Arc Testnet.
+
+> **Note on `src/app/`** — Next.js ignores `src/app` when an `app/` directory exists at the
+> repo root, so `src/app/page.tsx` is not rendered and is effectively dead code. Its stat
+> tiles still contain hardcoded values; only `app/pay/page.tsx` is live.
 
 ---
 
@@ -62,7 +84,7 @@ registry to read from.
 | Action | TX Hash |
 |--------|---------|
 | Agent Identity | `0x352df22241fcb83d5495bb332d71d28566bf711239b851e11f1e57b5cbad9e9d` |
-| Reputation (95/100) | `0x30595f699b69b133461867e68a71dd20d9722a3a4444aaa2692c6b2f4187fc3b` |
+| Reputation — score 95 for agent 15994, written via `giveFeedback` to the canonical ERC-8004 ReputationRegistry `0x8004B663056A597Dffe9eCcC1965A193B7388713` (delivered as an ERC-4337 UserOperation, so the tx `to` is EntryPoint v0.6) | `0x30595f699b69b133461867e68a71dd20d9722a3a4444aaa2692c6b2f4187fc3b` |
 | App Kit Send | `0xebd53bd965051b8cba4fd04554b9f704915276c8981c984a3c37bbd7314b5f01` |
 | App Kit Swap | `0x2e12fde67d0b578f0186b9622e994f37bdd22758600f861e6806f2a4a747105d` |
 | App Kit Bridge | `0xdc9024c2d55eba095c68073be7292ec6a62ed1eebb71d40f3385f7c306609505` |
