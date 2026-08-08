@@ -5,7 +5,7 @@
 **Live Demo:** https://freelancepay-ui.vercel.app  
 **GitHub:** https://github.com/nhmman/freelancepay-ui  
 **Agent ID:** 15994  
-**Reputation:** 95/100 (Expert Tier) — *simulated, see [note](#reputation-scoring-status)*
+**Reputation:** 95 — on-chain, see [note](#reputation-scoring-status)
 
 ---
 
@@ -23,12 +23,10 @@ FreelancePay is an AI Payment Agent that automates escrow and milestone payouts 
 
 | Feature | Description | Standard |
 |---------|-------------|---------|
-| **Quick Send** | Direct USDC transfer to freelancer | Circle App Kit |
-| **Multi-Milestone Escrow** | Project-based escrow with per-milestone release | Circle Wallets |
+| **Quick Send** | Direct USDC transfer to freelancer | wagmi + USDC on Arc |
+| **Multi-Milestone Escrow** | Project-based escrow with per-milestone release | wagmi + TimelockEscrow contract |
 | **Reputation Pricing** | Score-based payment tiers (+20%/+50% bonus) | App logic |
 | **Smart Job Contracts** | Full job lifecycle: Open→Funded→Submitted→Completed | Arc Testnet contract |
-| **AI Invoice Generator** | Describe work → AI creates invoice → instant payment | Claude AI |
-| **Portfolio Dashboard** | Multi-currency USDC+EURC with VND conversion | Arc FX |
 
 ---
 
@@ -39,9 +37,8 @@ FreelancePay is an AI Payment Agent that automates escrow and milestone payouts 
 - **Reputation:** ERC-8004 ReputationRegistry `0x8004B663056A597Dffe9eCcC1965A193B7388713`
 - **Commerce:** Smart job contracts on Arc Testnet
 - **Payments:** Circle Developer Controlled Wallets
-- **SDK:** Arc App Kit (Send, Swap, Bridge, Unified Balance)
+- **SDK:** Arc App Kit (Send, Swap)
 - **Frontend:** Next.js 16 + Tailwind CSS
-- **AI:** Claude Sonnet (Invoice generation)
 
 ### Reputation scoring status
 
@@ -118,13 +115,12 @@ npm run dev
 
 **Why we chose these products:**
 - **Circle Developer Wallets** — perfect for AI agent payments where users don't need to manage private keys
-- **Arc App Kit** — simplified Send/Swap/Bridge into single SDK calls, reduced code by 60%
+- **Arc App Kit** — simplified Send/Swap into single SDK calls
 - **USDC on Arc** — instant settlement with predictable fees, ideal for freelancer payouts
 
 **What worked well:**
 - App Kit's `kit.send()` replaced 30+ lines of manual Circle API calls
 - Circle Wallets adapter worked seamlessly with Arc Testnet
-- CCTP Bridge across Base Sepolia → Arc worked reliably
 
 **What could be improved:**
 - App Kit needs better error messages for insufficient balance cases

@@ -2,6 +2,12 @@
 import { useState } from "react";
 import Link from "next/link";
 
+// There is no /tip/<username> route — the tip flow takes the recipient as query
+// params (app/tip/page.tsx:22-23), which switch it into "custom" mode and prefill
+// the form. This is the same link shape the app produces when a user copies their
+// own tip link. Leo's wallet matches FEATURED[0] in app/tip/page.tsx.
+const TIP_LEO = "/tip?to=0x8b0e1414fb67888c9df36490fbdd342d9dc6c64c&name=Leo";
+
 const STEPS = [
   {
     id: 1,
@@ -46,7 +52,7 @@ const STEPS = [
     icon: "💸",
     title: "Send your first tip!",
     desc: "Go to a creator page and send a USDC tip. It arrives in under 1 second.",
-    action: { label: "Tip @leo →", url: "/tip/leo" },
+    action: { label: "Tip @leo →", url: TIP_LEO },
     detail: "No gas fees. No waiting. Tips settle instantly on Arc.",
   },
 ];
@@ -77,7 +83,7 @@ export default function StartPage() {
             <span className="font-bold text-lg">ArcTip</span>
             <span className="text-[10px] bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 px-2 py-0.5 rounded-full">TESTNET</span>
           </Link>
-          <Link href="/tip/leo" className="text-sm bg-gradient-to-r from-yellow-500 to-orange-500 px-4 py-2 rounded-xl font-medium">
+          <Link href={TIP_LEO} className="text-sm bg-gradient-to-r from-yellow-500 to-orange-500 px-4 py-2 rounded-xl font-medium">
             Try it now →
           </Link>
         </div>
@@ -205,7 +211,7 @@ export default function StartPage() {
             <p className="text-3xl mb-2">🎉</p>
             <h3 className="font-bold text-green-400 text-lg mb-1">You're ready!</h3>
             <p className="text-gray-400 text-sm mb-4">You can now send USDC tips on Arc Testnet</p>
-            <Link href="/tip/leo"
+            <Link href={TIP_LEO}
               className="inline-block bg-gradient-to-r from-yellow-500 to-orange-500 px-6 py-3 rounded-xl font-bold text-sm">
               Send Your First Tip →
             </Link>
@@ -221,7 +227,7 @@ export default function StartPage() {
               className="flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-2 rounded-xl text-sm transition-all">
               🐦 Share on X
             </a>
-            <Link href="/tip/leo"
+            <Link href={TIP_LEO}
               className="flex items-center gap-2 bg-gradient-to-r from-yellow-500 to-orange-500 hover:opacity-90 px-4 py-2 rounded-xl text-sm font-medium transition-all">
               💸 Try ArcTip
             </Link>

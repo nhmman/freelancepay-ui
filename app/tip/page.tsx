@@ -225,7 +225,7 @@ function App() {
                   <div style={{ background: "#FFFFFF", border: "1px solid #E2EAF8", borderRadius: 12, padding: "24px", textAlign: "center" as const }}>
                     <p style={{ color: "#4A6B8A", fontSize: 14, marginBottom: 16 }}>Connect your wallet to send a tip</p>
                     <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}><ConnectButton /></div>
-                    <a href="/start" style={{ fontSize: 13, color: "#2775CA", textDecoration: "none" }}>First time? Setup guide →</a>
+                    <a href="/tip/start" style={{ fontSize: 13, color: "#2775CA", textDecoration: "none" }}>First time? Setup guide →</a>
                   </div>
                 ) : (
                   <button onClick={tip} disabled={isPending || confirming || !canSend}
