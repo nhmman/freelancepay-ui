@@ -33,7 +33,6 @@ type Rep =
 
 const FEATURES = [
   { href:"/escrow", icon:"📋", title:"Multi-Milestone Escrow", tag:"ESCROW"   },
-  { href:"/nanopay",    icon:"⚡", title:"Nanopayments x402",      tag:"x402"     },
   { href:"/reputation", icon:"⭐", title:"Reputation Pricing",     tag:"Scoring"  },
   { href:"/jobs",       icon:"🤖", title:"Smart Jobs",             tag:"Arc Testnet" },
   { href:"/invoice",    icon:"🧾", title:"AI Invoice",             tag:"AI"       },

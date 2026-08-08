@@ -25,7 +25,6 @@ FreelancePay is an AI Payment Agent that automates escrow and milestone payouts 
 |---------|-------------|---------|
 | **Quick Send** | Direct USDC transfer to freelancer | Circle App Kit |
 | **Multi-Milestone Escrow** | Project-based escrow with per-milestone release | Circle Wallets |
-| **Nanopayments** | Pay-per-use API calls (0.001-0.01 USDC/call) | Arc x402 |
 | **Reputation Pricing** | Score-based payment tiers (+20%/+50% bonus) | App logic |
 | **Smart Job Contracts** | Full job lifecycle: Open→Funded→Submitted→Completed | Arc Testnet contract |
 | **AI Invoice Generator** | Describe work → AI creates invoice → instant payment | Claude AI |
