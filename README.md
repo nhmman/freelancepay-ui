@@ -83,8 +83,6 @@ Two caveats, so the numbers are not oversold:
 | Reputation — score 95 for agent 15994, written via `giveFeedback` to the canonical ERC-8004 ReputationRegistry `0x8004B663056A597Dffe9eCcC1965A193B7388713` (delivered as an ERC-4337 UserOperation, so the tx `to` is EntryPoint v0.6) | `0x30595f699b69b133461867e68a71dd20d9722a3a4444aaa2692c6b2f4187fc3b` |
 | App Kit Send | `0xebd53bd965051b8cba4fd04554b9f704915276c8981c984a3c37bbd7314b5f01` |
 | App Kit Swap | `0x2e12fde67d0b578f0186b9622e994f37bdd22758600f861e6806f2a4a747105d` |
-| App Kit Bridge | `0xdc9024c2d55eba095c68073be7292ec6a62ed1eebb71d40f3385f7c306609505` |
-| Unified Balance | `0x2060734995ec6914be917840155d186144b5117c66d6408749c14b83019736e6` |
 
 ---
 
