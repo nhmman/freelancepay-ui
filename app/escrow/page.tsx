@@ -296,6 +296,20 @@ export default function MilestonesPage() {
   const isDepositor = (a: Agreement) => a.depositor_address === me;
   const isBeneficiary = (a: Agreement) => a.beneficiary_address === me;
 
+  // Solo demo: prefill the form with the visitor's own wallet as beneficiary so a
+  // first-time user can run the whole escrow alone. Nothing on-chain is special about
+  // this — TimelockEscrow.fund() never required beneficiary != depositor, and
+  // release() accepts the depositor at any time, so the same wallet on both sides
+  // just works. This only fills the three inputs below; it deliberately leaves the
+  // auto-release toggle alone, since the agent can only release escrows it funded.
+  const fillSoloDemo = () => {
+    if (!address) return;
+    setBUsername(address);
+    setAmount("0.01");
+    setTerms("Solo test — deliver a sample link");
+    setCreateError(null);
+  };
+
   const canCreate = !!beneficiaryAddress && !!amount && parseFloat(amount) > 0 && terms.trim().length > 0;
 
   return (
@@ -334,6 +348,29 @@ export default function MilestonesPage() {
 
             <div style={{ background: "#FFFFFF", border: "1px solid #E2EAF8", borderRadius: 20, padding: 28, marginBottom: 28 }}>
               <div style={{ ...M, fontSize: 15, color: "#2775CA", marginBottom: 16 }}>// new escrow</div>
+
+              <div style={{ background: "#F4F7FD", border: "1px solid #E2EAF8", borderRadius: 14, padding: "14px 16px", marginBottom: 16 }}>
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 14, flexWrap: "wrap" }}>
+                  <div style={{ flex: "1 1 320px" }}>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: "#3B5878" }}>No one to test with?</div>
+                    <div style={{ ...M, fontSize: 13, fontWeight: 600, color: "#6B8DB8", marginTop: 3, lineHeight: 1.6 }}>
+                      Fills the form with your own wallet as the beneficiary. You play both sides,
+                      so the 0.01 USDC comes straight back to you — you only pay gas.
+                    </div>
+                  </div>
+                  <button onClick={fillSoloDemo} disabled={!address}
+                    style={{ ...M, fontSize: 14, fontWeight: 800, padding: "10px 18px", borderRadius: 10, border: "1px solid #2775CA55",
+                      background: address ? "#FFFFFF" : "#EBF2FD", color: address ? "#2775CA" : "#9BB5C8",
+                      cursor: address ? "pointer" : "not-allowed", whiteSpace: "nowrap" }}>
+                    Try it solo
+                  </button>
+                </div>
+                <div style={{ ...M, fontSize: 12, fontWeight: 600, color: "#6B8DB8", marginTop: 11, paddingTop: 11, borderTop: "1px solid #E2EAF8", lineHeight: 1.6 }}>
+                  Covers Create → Fund → Submit Work → Approve &amp; Release. It does <strong style={{ color: "#3B5878" }}>not</strong> include
+                  agent auto-release — the agent can only release escrows it funded itself.
+                </div>
+              </div>
+
               <div style={{ marginBottom: 14 }}>
                 <div style={{ ...M, fontSize: 15, fontWeight: 600, color: "#3B5878", marginBottom: 8 }}>BENEFICIARY (username or wallet address)</div>
                 <input value={bUsername} onChange={e => setBUsername(e.target.value)} placeholder="leo   or   0x1234…abcd" />
@@ -402,6 +439,14 @@ export default function MilestonesPage() {
                   ✗ {createError}
                 </div>
               )}
+
+              <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid #F0F5FF" }}>
+                <p style={{ fontSize: 13, color: "#6B8DB8", marginBottom: 8 }}>No testnet USDC yet?</p>
+                <a href="https://faucet.circle.com" target="_blank" rel="noopener noreferrer"
+                  style={{ fontSize: 14, color: "#2775CA", textDecoration: "none" }}>
+                  Get free USDC from Circle Faucet →
+                </a>
+              </div>
             </div>
 
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
