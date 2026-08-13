@@ -16,7 +16,9 @@ import { createPublicClient, createWalletClient, http, parseAbiItem } from "viem
 import { arcTestnet } from "viem/chains";
 import { privateKeyToAccount } from "viem/accounts";
 import { TIMELOCK_ADDRESS, TIMELOCK_ABI } from "../../../lib/timelockEscrow";
-import { supabase } from "../../../lib/supabase";
+// Service role client (bypass RLS) thay cho anon client. Route này đã chặn bằng
+// CRON_SECRET nên là chỗ an toàn nhất để đi trước trong đợt refactor RLS.
+import { getSupabaseAdmin } from "../../../lib/supabaseAdmin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -72,6 +74,15 @@ export async function POST(request: NextRequest) {
   } catch {
     // Không log key, chỉ nói là parse fail.
     return Response.json({ ok: false, error: "AGENT_PRIVATE_KEY is malformed" }, { status: 500 });
+  }
+
+  // Dựng sau lớp chặn ở trên: thiếu key thì báo rõ, cùng kiểu fail-closed như
+  // CRON_SECRET/AGENT_PRIVATE_KEY chứ không ném stack trace ra ngoài.
+  let supabase;
+  try {
+    supabase = getSupabaseAdmin();
+  } catch (e: any) {
+    return Response.json({ ok: false, error: e?.message || "Supabase admin client is not configured" }, { status: 500 });
   }
 
   const publicClient = createPublicClient({ chain: arcTestnet, transport: http() });
