@@ -18,7 +18,7 @@ import { privateKeyToAccount } from "viem/accounts";
 import { TIMELOCK_ADDRESS, TIMELOCK_ABI } from "../../../lib/timelockEscrow";
 // Service role client (bypass RLS) thay cho anon client. Route này đã chặn bằng
 // CRON_SECRET nên là chỗ an toàn nhất để đi trước trong đợt refactor RLS.
-import { getSupabaseAdmin } from "../../../lib/supabaseAdmin";
+import { getSupabaseAdmin, SupabaseConfigError } from "../../../lib/supabaseAdmin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -82,7 +82,17 @@ export async function POST(request: NextRequest) {
   try {
     supabase = getSupabaseAdmin();
   } catch (e: any) {
-    return Response.json({ ok: false, error: e?.message || "Supabase admin client is not configured" }, { status: 500 });
+    // `variable` cho biết CHÍNH XÁC biến nào phải sửa; `error_kind` để đọc log
+    // cron là biết ngay thuộc loại nào mà không cần đoán từ câu chữ.
+    return Response.json(
+      {
+        ok: false,
+        error_kind: e instanceof SupabaseConfigError ? "env_misconfigured" : "supabase_client_init_failed",
+        variable: e instanceof SupabaseConfigError ? e.variable : undefined,
+        error: e?.message || "Supabase admin client could not be created",
+      },
+      { status: 500 },
+    );
   }
 
   const publicClient = createPublicClient({ chain: arcTestnet, transport: http() });
@@ -100,8 +110,21 @@ export async function POST(request: NextRequest) {
     .limit(MAX_PER_RUN);
 
   if (queryError) {
+    // Phân biệt "Supabase từ chối key" với lỗi query thật (bảng/cột/mạng). Guard
+    // lúc khởi tạo chỉ bắt được key thiếu/rỗng/sai hình dạng; một key ĐÚNG hình
+    // dạng nhưng đã bị revoke, hết hạn, hay thuộc project khác thì chỉ lộ ra ở
+    // đây, qua chính câu trả lời của Supabase.
+    const rejectedKey = /invalid api key|invalid authentication|apikey|jwt|unauthorized/i
+      .test(queryError.message);
     return Response.json(
-      { ok: false, error: `Could not query escrows that are due: ${queryError.message}` },
+      {
+        ok: false,
+        error_kind: rejectedKey ? "supabase_rejected_key" : "query_failed",
+        variable: rejectedKey ? "SUPABASE_SERVICE_ROLE_KEY" : undefined,
+        error: rejectedKey
+          ? `Supabase rejected the credentials in SUPABASE_SERVICE_ROLE_KEY (the variable is set and well-formed, so the value itself is wrong — revoked, expired, or from a different project): ${queryError.message}`
+          : `Could not query escrows that are due: ${queryError.message}`,
+      },
       { status: 500 },
     );
   }
