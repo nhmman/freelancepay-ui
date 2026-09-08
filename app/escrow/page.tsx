@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useAccount, useReadContract, useChainId, useSwitchChain, useWriteContract, usePublicClient } from "wagmi";
+import { useAccount, useReadContract, useChainId, useSwitchChain, useWriteContract, usePublicClient, useSignMessage } from "wagmi";
 import { parseUnits, isAddress } from "viem";
 import { TIMELOCK_ADDRESS, USDC_ADDRESS, TIMELOCK_ABI, USDC_APPROVE_ABI } from "../../lib/timelockEscrow";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
@@ -47,6 +47,34 @@ const normalizeUrl = (raw: string): { ok: boolean; url?: string; error?: string 
   }
 };
 
+// Gửi một thao tác ghi qua route handler (service_role) thay vì ghi thẳng Supabase từ
+// browser. Trả về câu lỗi, hoặc null khi thành công — mỗi chỗ gọi tự quyết cách hiển thị.
+const postJson = async (path: string, body: unknown): Promise<string | null> => {
+  try {
+    const r = await fetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const j = (await r.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
+    if (!r.ok || !j?.ok) return j?.error ?? `request failed (${r.status})`;
+    return null;
+  } catch (e) {
+    return e instanceof Error ? e.message : "network error";
+  }
+};
+
+// PHẢI khớp từng byte với approvalMessage() trong app/api/escrow/approve/route.ts.
+// Lệch một dấu cách là server recover ra địa chỉ khác và mọi approve fail 403.
+const approvalMessage = (id: string, issuedAt: string): string =>
+  [
+    "Statio escrow approval",
+    `Escrow: ${id}`,
+    "Action: APPROVE",
+    `Chain: ${ARC_ID}`,
+    `Issued: ${issuedAt}`,
+  ].join("\n");
+
 type Agreement = {
   id: string;
   depositor_address: string;
@@ -78,6 +106,7 @@ export default function MilestonesPage() {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const { switchChain } = useSwitchChain();
+  const { signMessageAsync } = useSignMessage();
   const onArc = chainId === ARC_ID;
   const [mounted, setMounted] = useState(false);
 
@@ -144,35 +173,26 @@ export default function MilestonesPage() {
     setCreating(true);
     setCreateError(null);
     const wantsAgent = isAgentWallet && autoRelease;
-    const { error } = await supabase.from("escrow_agreements").insert({
-      depositor_address: me,
-      beneficiary_username: isDirectAddr ? short(bTrimmed) : slug,
-      beneficiary_address: beneficiaryAddress.toLowerCase(),
-      amount_usdc: parseFloat(amount),
+    // status "DRAFT" không gửi từ đây nữa — route tự đặt, nằm trong whitelist của nó.
+    const err = await postJson("/api/escrow/create", {
+      depositorAddress: me,
+      beneficiaryUsername: isDirectAddr ? short(bTrimmed) : slug,
+      beneficiaryAddress: beneficiaryAddress.toLowerCase(),
+      amountUsdc: parseFloat(amount),
       terms: terms.trim(),
-      status: "DRAFT",
-      // Only send this column when the toggle is on. Leaving it out of the default
+      // Only send this key when the toggle is on. Leaving it out of the default
       // payload means a database that hasn't run the migration yet still creates
       // ordinary escrows, instead of every insert failing on "column does not exist".
-      ...(wantsAgent ? { agent_auto_release: true } : {}) });
+      ...(wantsAgent ? { agentAutoRelease: true } : {}) });
     setCreating(false);
-    if (error) {
+    if (err) {
       // Surface the failure instead of silently clearing the form — keeps the
       // user's input so they can retry once the backend is reachable again.
-      setCreateError(`Couldn't create escrow — ${error.message}`);
+      setCreateError(`Couldn't create escrow — ${err}`);
       return;
     }
     setBUsername(""); setAmount(""); setTerms(""); setAutoRelease(false);
     load();
-  };
-
-  const setStatus = async (id: string, status: string, extra: Record<string, unknown> = {}): Promise<boolean> => {
-    const { error } = await supabase.from("escrow_agreements")
-      .update({ status, updated_at: new Date().toISOString(), ...extra })
-      .eq("id", id);
-    if (error) { alert(`Couldn't save the update — ${error.message}. Please try again.`); return false; }
-    load();
-    return true;
   };
 
   const openDeliverableEditor = (a: Agreement) => {
@@ -183,19 +203,33 @@ export default function MilestonesPage() {
   const submitDeliverable = async (a: Agreement) => {
     const res = normalizeUrl(deliverableInput);
     if (!res.ok) { setDeliverableError(res.error ?? "Invalid link"); return; }
-    const ok = await setStatus(a.id, "SUBMITTED", { deliverable_url: res.url });
-    if (ok) { setDeliverableEditId(null); setDeliverableInput(""); setDeliverableError(null); }
+    const err = await postJson("/api/escrow/deliverable", { id: a.id, deliverableUrl: res.url });
+    if (err) { alert(`Couldn't save the update — ${err}. Please try again.`); return; }
+    load();
+    setDeliverableEditId(null); setDeliverableInput(""); setDeliverableError(null);
   };
 
   // Auto-release path: Approve only records the decision and the earliest release time,
   // then hands off to the agent watcher (app/api/agent-release). It deliberately does
   // NOT touch the contract — the point of the demo is that the release transaction is
-  // signed by the agent, not by this browser. setStatus already surfaces DB errors.
+  // signed by the agent, not by this browser. Lỗi từ /api/escrow/approve hiện ở alert.
   const approveForAgent = async (a: Agreement) => {
     setApprovingId(a.id);
-    const releaseAt = new Date(Date.now() + AGENT_DELAY_SECONDS * 1000).toISOString();
-    await setStatus(a.id, "APPROVED", { agent_release_at: releaseAt });
-    setApprovingId(null);
+    try {
+      // Chữ ký bind vào đúng escrow + hành động + chain + thời điểm phát hành; server so
+      // signer với depositor_address đọc từ DB chứ không tin address client gửi lên.
+      // agent_release_at cũng do server tính — client không gửi mốc thời gian nào cả.
+      const issuedAt = new Date().toISOString();
+      const signature = await signMessageAsync({ message: approvalMessage(a.id, issuedAt) });
+      const err = await postJson("/api/escrow/approve", { id: a.id, issuedAt, signature });
+      if (err) { alert(`Couldn't save the update — ${err}. Please try again.`); return; }
+      load();
+    } catch (e) {
+      const err = e as { shortMessage?: string; message?: string } | null;
+      alert("Approve failed or rejected: " + (err?.shortMessage || err?.message || "unknown"));
+    } finally {
+      setApprovingId(null);
+    }
   };
 
   // After a successful on-chain tx, persist the new status. The on-chain action is
@@ -205,14 +239,12 @@ export default function MilestonesPage() {
   const persistAfterTx = useCallback(async (
     id: string, fields: Record<string, unknown>, label: string, txHash: string,
   ) => {
-    const { error } = await supabase.from("escrow_agreements")
-      .update({ ...fields, updated_at: new Date().toISOString() })
-      .eq("id", id);
-    if (error) {
+    const err = await postJson("/api/escrow/sync", { id, fields });
+    if (err) {
       retrySyncRef.current = () => persistAfterTx(id, fields, label, txHash);
       setSyncWarning(
         `On-chain ${label} succeeded and is FINAL (tx ${txHash.slice(0, 10)}…) — but saving the new ` +
-        `status to the database failed: ${error.message}. Do NOT repeat the ${label}; the funds already ` +
+        `status to the database failed: ${err}. Do NOT repeat the ${label}; the funds already ` +
         `moved. Press "Retry sync" to save the status again — this never re-runs the transaction.`,
       );
       return;
