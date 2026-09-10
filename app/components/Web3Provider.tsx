@@ -11,9 +11,26 @@ const arcTestnet = {
   rpcUrls: { default: { http: ["https://rpc.testnet.arc.network"] } },
   blockExplorers: { default: { name: "ArcScan", url: "https://testnet.arcscan.app" } } } as const;
 
+// projectId của Reown/WalletConnect đọc từ env, KHÔNG hard-code. Giá trị cũ nằm ngay
+// trong code (2b0b4e6e…) là placeholder giả: pulse.walletconnect.org trả 403 cho nó nên
+// ví không kết nối được. Tiền tố NEXT_PUBLIC_ là bắt buộc — đây là client component nên
+// Next inline giá trị vào bundle lúc build, biến không có tiền tố sẽ là undefined ở
+// browser. Lấy project ID ở https://dashboard.reown.com.
+const projectId = process.env.NEXT_PUBLIC_REOWN_PROJECT_ID;
+if (!projectId) {
+  // Fail closed ngay lúc khởi tạo module, không fallback về giá trị mặc định: một
+  // projectId thiếu hoặc sai chỉ lộ ra rất muộn, dưới dạng 403 từ
+  // pulse.walletconnect.org lúc người dùng bấm Connect Wallet, và lúc đó thì gần như
+  // không truy được nguyên nhân. Thà vỡ ngay ở đây với đúng tên biến cần đặt.
+  throw new Error(
+    "NEXT_PUBLIC_REOWN_PROJECT_ID is not set. Get the project ID from https://dashboard.reown.com, " +
+    "then add it to .env.local for local dev and to the Vercel project environment variables for production.",
+  );
+}
+
 const config = getDefaultConfig({
   appName: "Statio",
-  projectId: "2b0b4e6e3c7d4f8a9b0c1d2e3f4a5b6c",
+  projectId,
   chains: [arcTestnet],
   transports: { [arcTestnet.id]: http("https://rpc.testnet.arc.network") } });
 
