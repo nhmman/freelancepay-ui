@@ -102,6 +102,31 @@ const STATUS_STYLE: Record<string, { bg: string; color: string; label: string }>
   RELEASED:  { bg: "#FFFFFF", color: "#2775CA", label: "Released ✓" },
   REFUNDED:  { bg: "#FFF5F5", color: "#DC2626", label: "Refunded" } };
 
+// Các chặng của một lượt fund. Tách riêng "ví đang chờ user bấm" với "đã gửi lên
+// chain, đang chờ confirm": hai lần chờ này đòi user làm hai việc khác hẳn nhau
+// (một bên phải thao tác, một bên chỉ cần ngồi yên), gộp chung một label như bản
+// cũ là nói dối người dùng. Bước đọc nonce không có tx nào nên cũng phải có nhãn
+// riêng, nếu không nó hiện nhầm là đang chờ ví.
+type FundPhase =
+  | "approve-wallet"
+  | "approve-confirm"
+  | "reading-nonce"
+  | "fund-wallet"
+  | "fund-confirm"
+  | "syncing";
+
+// `btn` là nhãn ngắn cho nút, `label` là câu đầy đủ cho panel bên dưới. `reassure`
+// chỉ bật ở hai chặng *-confirm — lúc tx đã nằm trên chain và đóng cửa sổ cũng
+// không mất tiền. Bật nó ở chặng chờ ví thì lời trấn an đó thành sai.
+const FUND_PHASE: Record<FundPhase, { btn: string; label: string; reassure: boolean }> = {
+  "approve-wallet":  { btn: "Approving...", label: "Confirm the USDC approval in your wallet",   reassure: false },
+  "approve-confirm": { btn: "Approving...", label: "Approval sent — waiting for Arc to confirm", reassure: true  },
+  "reading-nonce":   { btn: "Preparing...", label: "Reading the next escrow ID from the contract", reassure: false },
+  "fund-wallet":     { btn: "Funding...",   label: "Confirm the funding transaction in your wallet", reassure: false },
+  "fund-confirm":    { btn: "Funding...",   label: "Funds sent — waiting for Arc to confirm",    reassure: true  },
+  "syncing":         { btn: "Saving...",    label: "Saving the escrow status",                   reassure: false },
+};
+
 export default function MilestonesPage() {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
@@ -264,7 +289,12 @@ export default function MilestonesPage() {
   const pc = usePublicClient();
   const { writeContractAsync } = useWriteContract();
   const [fundingId, setFundingId] = useState<string | null>(null);
-  const [fundStep, setFundStep] = useState("");
+  const [fundPhase, setFundPhase] = useState<FundPhase | null>(null);
+  // Hash giữ trên state thay vì const cục bộ, để hiện link ArcScan NGAY khi ví trả
+  // hash về chứ không phải đợi receipt — đúng lúc user sốt ruột nhất thì mới có cái
+  // để bấm vào xem. Cả hai reset ở đầu mỗi lượt fund.
+  const [fundApproveHash, setFundApproveHash] = useState<`0x${string}` | null>(null);
+  const [fundTxHash, setFundTxHash] = useState<`0x${string}` | null>(null);
 
   const TIMELOCK_SECONDS = 7 * 24 * 60 * 60; // 7-day dispute window before auto-release
 
@@ -272,26 +302,38 @@ export default function MilestonesPage() {
     if (!pc || !address) return;
     try {
       setFundingId(a.id);
+      // Xoá hash của lượt trước, nếu không panel sẽ mở ra kèm link tx cũ.
+      setFundApproveHash(null); setFundTxHash(null);
       const amt = parseUnits(String(a.amount_usdc), 6);
-      setFundStep("Approving USDC...");
+
+      // Đặt nhãn TRƯỚC writeContractAsync: lúc này ví mới bật popup, user là người
+      // phải hành động. Chỉ khi hàm này trả về (đã ký) mới chuyển sang chờ mạng.
+      setFundPhase("approve-wallet");
       const approveHash = await writeContractAsync({
         address: USDC_ADDRESS, abi: USDC_APPROVE_ABI, functionName: "approve",
         args: [TIMELOCK_ADDRESS, amt] });
+      setFundApproveHash(approveHash);
+      setFundPhase("approve-confirm");
       await pc.waitForTransactionReceipt({ hash: approveHash });
 
-      setFundStep("Locking funds...");
+      setFundPhase("reading-nonce");
       const idBefore = await pc.readContract({ address: TIMELOCK_ADDRESS, abi: TIMELOCK_ABI, functionName: "nonce" }) as bigint;
+
+      setFundPhase("fund-wallet");
       const fundHash = await writeContractAsync({
         address: TIMELOCK_ADDRESS, abi: TIMELOCK_ABI, functionName: "fund",
         args: [a.beneficiary_address as `0x${string}`, amt, BigInt(TIMELOCK_SECONDS)] });
+      setFundTxHash(fundHash);
+      setFundPhase("fund-confirm");
       await pc.waitForTransactionReceipt({ hash: fundHash });
       const paymentId = Number(idBefore);
 
+      setFundPhase("syncing");
       await persistAfterTx(a.id, { status: "FUNDED", payment_id: paymentId, tx_hash_fund: fundHash }, "funding", fundHash);
     } catch (e: any) {
       alert("Funding failed or rejected: " + (e?.shortMessage || e?.message || "unknown"));
     } finally {
-      setFundingId(null); setFundStep("");
+      setFundingId(null); setFundPhase(null);
     }
   };
 
@@ -350,6 +392,7 @@ export default function MilestonesPage() {
         input,textarea{color:#0A1628!important;background:#F4F7FD;border:1px solid #E2EAF8;border-radius:10px;padding:12px 14px;width:100%;font-size:14px}
         input:focus,textarea:focus{outline:none;border-color:#2775CA;box-shadow:0 0 0 3px rgba(39,117,202,0.1)}
         textarea{font-family:inherit;resize:vertical;min-height:80px}
+        @keyframes spin{to{transform:rotate(360deg)}}
       ` }} />
       <div style={{ maxWidth: 820, margin: "0 auto", padding: "40px 24px", color: "#0A1628" }}>
         <div style={{ ...M, fontSize: 15, color: "#2775CA", marginBottom: 8 }}>// milestone escrow · on-chain</div>
@@ -506,6 +549,7 @@ export default function MilestonesPage() {
                   const st = STATUS_STYLE[a.status] ?? STATUS_STYLE.DRAFT;
                   const dep = isDepositor(a);
                   const ben = isBeneficiary(a);
+                  const funding = fundingId === a.id;
                   return (
                     <div key={a.id} style={{ background: "#FFFFFF", border: "1px solid #E2EAF8", borderRadius: 16, padding: 20 }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
@@ -524,8 +568,20 @@ export default function MilestonesPage() {
                       </div>
 
                       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                        {/* Sai chain thì tx chắc chắn fail ở tầng ví, nên chặn ngay tại nút thay vì
+                            để user bấm rồi mới biết. Cảnh báo + nút Switch vẫn ở cuối trang. */}
                         {dep && a.status === "DRAFT" && (
-                          <button onClick={() => fundEscrow(a)} disabled={fundingId === a.id} style={btnPrimary}>{fundingId === a.id ? fundStep || "Processing..." : "Fund Escrow →"}</button>
+                          <button onClick={() => fundEscrow(a)} disabled={funding || !onArc}
+                            title={!onArc ? "Switch to Arc Testnet to fund this escrow" : undefined}
+                            style={{ ...btnPrimary, display: "inline-flex", alignItems: "center", gap: 8,
+                              ...(funding || !onArc
+                                ? { background: "#EBF2FD", color: "#9BB5C8", cursor: funding ? "wait" : "not-allowed" }
+                                : {}) }}>
+                            {funding && <div style={spinStyle(14, "#9BB5C8")} />}
+                            {funding
+                              ? (fundPhase ? FUND_PHASE[fundPhase].btn : "Processing...")
+                              : !onArc ? "Switch network to fund" : "Fund Escrow →"}
+                          </button>
                         )}
                         {ben && a.status === "FUNDED" && deliverableEditId !== a.id && (
                           <button onClick={() => openDeliverableEditor(a)} style={btnGhost}>Submit Work</button>
@@ -576,6 +632,45 @@ export default function MilestonesPage() {
                         )}
                       </div>
 
+                      {funding && fundPhase && (
+                        <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid #F0F5FF" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                            <div style={spinStyle(15, "#2775CA")} />
+                            <span style={{ ...M, fontSize: 14, fontWeight: 700, color: "#2775CA" }}>
+                              {FUND_PHASE[fundPhase].label}
+                            </span>
+                          </div>
+
+                          {FUND_PHASE[fundPhase].reassure && (
+                            <div style={{ ...M, fontSize: 13, fontWeight: 600, color: "#6B8DB8", marginTop: 8, lineHeight: 1.6 }}>
+                              Nothing left to do here — please keep this window open. Even if you close it,
+                              the transaction is already on Arc and your funds are safe.
+                            </div>
+                          )}
+
+                          {(fundApproveHash || fundTxHash) && (
+                            <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 6 }}>
+                              {fundApproveHash && (
+                                <div style={txLine}>
+                                  Approve tx{" "}
+                                  <a href={`https://testnet.arcscan.app/tx/${fundApproveHash}`} target="_blank" rel="noopener noreferrer" style={{ color: "#2775CA" }}>
+                                    {fundApproveHash.slice(0, 10)}… ↗
+                                  </a>
+                                </div>
+                              )}
+                              {fundTxHash && (
+                                <div style={txLine}>
+                                  Fund tx{" "}
+                                  <a href={`https://testnet.arcscan.app/tx/${fundTxHash}`} target="_blank" rel="noopener noreferrer" style={{ color: "#2775CA" }}>
+                                    {fundTxHash.slice(0, 10)}… ↗
+                                  </a>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                       {deliverableEditId === a.id && (
                         <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid #F0F5FF" }}>
                           <div style={{ ...M, fontSize: 14, fontWeight: 600, color: "#3B5878", marginBottom: 8 }}>Deliverable link</div>
@@ -619,3 +714,8 @@ const btnPrimary: React.CSSProperties = { padding: "10px 18px", borderRadius: 10
 const btnGhost: React.CSSProperties = { padding: "10px 18px", borderRadius: 10, border: "1px solid #2A3830", background: "transparent", color: "#3B5878", fontWeight: 700, fontSize: 15, cursor: "pointer" };
 const btnAgent: React.CSSProperties = { padding: "10px 18px", borderRadius: 10, border: "none", background: "linear-gradient(135deg,#7C3AED,#5B21B6)", color: "#FFFFFF", fontSize: 15, fontWeight: 700, cursor: "pointer" };
 const btnDanger: React.CSSProperties = { padding: "10px 18px", borderRadius: 10, border: "1px solid #FECACA", background: "transparent", color: "#DC2626", fontSize: 15, fontWeight: 700, cursor: "pointer" };
+// Keyframes `spin` khai báo trong block <style> của trang.
+const spinStyle = (size: number, color: string): React.CSSProperties => ({
+  width: size, height: size, border: `2px solid ${color}33`, borderTopColor: color,
+  borderRadius: "50%", animation: "spin 0.7s linear infinite", flexShrink: 0 });
+const txLine: React.CSSProperties = { ...M, fontSize: 12, fontWeight: 600, color: "#6B8DB8" };
