@@ -43,6 +43,41 @@ const RELEASED_EVENT = parseAbiItem("event EscrowReleased(uint256 indexed id, ad
 // bị tsc từ chối — cùng lý do code sẵn có luôn viết BigInt(...).
 const HEAL_LOOKBACK_BLOCKS = BigInt(5000);
 
+// ── Retry cho riêng bước truy vấn escrow đến hạn ─────────────────────────────
+// Supabase thỉnh thoảng trả Gateway Timeout ở đúng bước này, làm cả lần cron chết
+// với error_kind "query_failed" dù không có gì sai về cấu hình hay dữ liệu.
+//
+// Ngân sách thời gian: 5s + 1s + 5s + 3s + 5s = 19s cho cả 3 lần, dưới timeout
+// của Vercel và dưới --max-time 90 của workflow.
+//
+// Vì sao phải có timeout MỖI lần thay vì chỉ đếm số lần: postgrest-js 2.108.2 có
+// retry riêng BẬT SẴN (retryEnabled = true) — với GET nó tự thử lại tới 3 lần nữa
+// cho lỗi mạng và cho status 503/520, backoff 1s/2s/4s, và nếu Supabase gửi kèm
+// header Retry-After thì nó ngủ đúng số giây đó. Không chặn thì một "lần" ở đây có
+// thể phình ra rất lâu và vượt ngân sách. AbortSignal kẹp cả chuỗi retry nội bộ đó
+// vì signal được truyền vào cả fetch lẫn hàm sleep bên trong thư viện.
+const QUERY_ATTEMPT_TIMEOUT_MS = 5000;
+const QUERY_RETRY_BACKOFF_MS = [1000, 3000];
+
+// CHỈ thử lại lỗi hạ tầng tạm thời. Lỗi auth và lỗi cú pháp query là lỗi tất định:
+// thử lại chỉ tốn thêm 4s rồi vẫn fail y như cũ, và làm chậm lúc báo lỗi thật.
+//
+// Phân loại theo HTTP status chứ không theo câu chữ của message: status là thứ duy
+// nhất ổn định ở đây. Khi gateway timeout, body trả về là trang HTML của gateway
+// chứ không phải JSON của PostgREST, nên message lúc đó là cả đoạn HTML.
+function isTransientQueryFailure(status: number, message: string): boolean {
+  // status = 0: fetch không nhận được phản hồi HTTP nào — hết hạn attempt
+  // (AbortSignal), kết nối đứt, DNS fail. Lỗi auth/cú pháp LUÔN có status thật
+  // (401/403/400), nên nhánh này không bao giờ trùng với chúng.
+  if (status === 0) return true;
+  if (status === 408 || status === 425) return true; // Request Timeout, Too Early
+  if (status >= 500 && status <= 599) return true;   // gồm 502/503/504/520 (Cloudflare)
+  // Còn lại (400 cú pháp, 401/403 auth, 404 sai bảng, 406, 429) thì fail ngay.
+  // Giữ message trong chữ ký hàm để chỗ gọi không phải đoán — hiện chưa cần soi.
+  void message;
+  return false;
+}
+
 type Result =
   | "released"              // agent ký tx thành công + DB đã cập nhật
   | "synced_already_onchain" // on-chain đã Released từ trước, chỉ chữa lại DB
@@ -100,14 +135,36 @@ export async function POST(request: NextRequest) {
 
   // ── Tìm escrow đến hạn ──────────────────────────────────────────────────────
   const nowIso = new Date().toISOString();
-  const { data: due, error: queryError } = await supabase
+  // Dựng builder MỚI cho mỗi lần thử: builder đã chạy mang theo signal đã hết hạn,
+  // dùng lại thì lần thử sau abort ngay lập tức. nowIso vẫn tính một lần để mốc
+  // "đến hạn" không trôi giữa các lần thử.
+  const queryDue = () => supabase
     .from("escrow_agreements")
     .select("id, payment_id, amount_usdc, beneficiary_address, agent_release_at")
     .eq("agent_auto_release", true)
     .eq("status", "APPROVED")
     .lte("agent_release_at", nowIso)
     .order("agent_release_at", { ascending: true })
-    .limit(MAX_PER_RUN);
+    .limit(MAX_PER_RUN)
+    .abortSignal(AbortSignal.timeout(QUERY_ATTEMPT_TIMEOUT_MS))
+    // Tắt retry nội bộ của postgrest-js (tự thử lại 503/520, xem ghi chú ở trên): cộng
+    // với vòng retry bên dưới thành tới 9 request dồn vào một Supabase đang yếu, và lỗi
+    // cuối bị che thành TimeoutError thay vì status thật. Vòng retry bên dưới là đủ.
+    .retry(false);
+
+  let dueQuery = await queryDue();
+  for (
+    let retry = 0;
+    dueQuery.error
+      && retry < QUERY_RETRY_BACKOFF_MS.length
+      && isTransientQueryFailure(dueQuery.status, dueQuery.error.message);
+    retry++
+  ) {
+    await new Promise<void>(resolve => setTimeout(resolve, QUERY_RETRY_BACKOFF_MS[retry]));
+    dueQuery = await queryDue();
+  }
+
+  const { data: due, error: queryError } = dueQuery;
 
   if (queryError) {
     // Phân biệt "Supabase từ chối key" với lỗi query thật (bảng/cột/mạng). Guard
