@@ -20,7 +20,7 @@
 
 8. Đổi env var trên Vercel **phải redeploy mới có tác dụng** — luôn nhắc tôi điều này.
 
-9. Cron GitHub Actions thực tế chạy cách nhau **50-95 phút** dù cấu hình 5 phút. Trước mọi demo trực tiếp phải bấm `workflow_dispatch` thủ công.
+9. Cron GitHub Actions cấu hình `*/5` nhưng thực tế trung vị **~208 phút** (đo 100 run, 26/8-11/9); demo phải bấm Run workflow thủ công.
 
 10. USDC trên Arc có **hai giao diện**: ERC-20 6 decimals, native 18 decimals. Xử lý quy đổi ở tầng hiển thị, không ở tầng gọi contract.
 
