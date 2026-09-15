@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useAccount, useReadContract, useChainId, useSwitchChain, useWriteContract, usePublicClient, useSignMessage } from "wagmi";
-import { parseUnits, isAddress } from "viem";
+import { useAccount, useReadContract, useSwitchChain, useWriteContract, usePublicClient, useSignMessage } from "wagmi";
+import { parseUnits, isAddress, UserRejectedRequestError, ChainMismatchError } from "viem";
 import { TIMELOCK_ADDRESS, USDC_ADDRESS, TIMELOCK_ABI, USDC_APPROVE_ABI } from "../../lib/timelockEscrow";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import Layout from "../components/Layout";
@@ -11,6 +11,14 @@ import { REGISTRY_ADDRESS as REGISTRY, REGISTRY_ABI } from "../../lib/registry";
 const ZERO = "0x0000000000000000000000000000000000000000";
 const ARC_ID = 5042002;
 const ARBITER = "0x7ef0bc69160888ffb934619a6d595d0a8c0c9774";
+
+// USDC_APPROVE_ABI trong lib/timelockEscrow.ts chỉ khai báo approve. Khai báo riêng
+// allowance ở đây để đọc hạn mức đã cấp mà không phải sửa file dùng chung.
+const USDC_ALLOWANCE_ABI = [
+  { name: "allowance", type: "function", stateMutability: "view",
+    inputs: [{ name: "owner", type: "address" }, { name: "spender", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }] },
+] as const;
 
 // ── Agent Pay MVP ────────────────────────────────────────────────────────────
 // The agent must BE the escrow's depositor: TimelockEscrow.release() only accepts
@@ -108,6 +116,7 @@ const STATUS_STYLE: Record<string, { bg: string; color: string; label: string }>
 // cũ là nói dối người dùng. Bước đọc nonce không có tx nào nên cũng phải có nhãn
 // riêng, nếu không nó hiện nhầm là đang chờ ví.
 type FundPhase =
+  | "checking-allowance"
   | "approve-wallet"
   | "approve-confirm"
   | "reading-nonce"
@@ -117,19 +126,59 @@ type FundPhase =
 
 // `btn` là nhãn ngắn cho nút, `label` là câu đầy đủ cho panel bên dưới. `reassure`
 // chỉ bật ở hai chặng *-confirm — lúc tx đã nằm trên chain và đóng cửa sổ cũng
-// không mất tiền. Bật nó ở chặng chờ ví thì lời trấn an đó thành sai.
-const FUND_PHASE: Record<FundPhase, { btn: string; label: string; reassure: boolean }> = {
-  "approve-wallet":  { btn: "Approving...", label: "Confirm the USDC approval in your wallet",   reassure: false },
-  "approve-confirm": { btn: "Approving...", label: "Approval sent — waiting for Arc to confirm", reassure: true  },
-  "reading-nonce":   { btn: "Preparing...", label: "Reading the next escrow ID from the contract", reassure: false },
-  "fund-wallet":     { btn: "Funding...",   label: "Confirm the funding transaction in your wallet", reassure: false },
-  "fund-confirm":    { btn: "Funding...",   label: "Funds sent — waiting for Arc to confirm",    reassure: true  },
-  "syncing":         { btn: "Saving...",    label: "Saving the escrow status",                   reassure: false },
+// không mất tiền. Bật nó ở chặng chờ ví thì lời trấn an đó thành sai. `step` là cụm
+// danh từ để ghép vào câu báo lỗi, nói được lỗi rơi ở chặng nào.
+const FUND_PHASE: Record<FundPhase, { btn: string; label: string; reassure: boolean; step: string }> = {
+  "checking-allowance": { btn: "Checking...",  label: "Checking the USDC allowance you already gave", reassure: false, step: "checking your USDC allowance" },
+  "approve-wallet":  { btn: "Approving...", label: "Confirm the USDC approval in your wallet",   reassure: false, step: "the USDC approval" },
+  "approve-confirm": { btn: "Approving...", label: "Approval sent — waiting for Arc to confirm", reassure: true,  step: "confirming the USDC approval" },
+  "reading-nonce":   { btn: "Preparing...", label: "Reading the next escrow ID from the contract", reassure: false, step: "reading the next escrow ID" },
+  "fund-wallet":     { btn: "Funding...",   label: "Confirm the funding transaction in your wallet", reassure: false, step: "the funding transaction" },
+  "fund-confirm":    { btn: "Funding...",   label: "Funds sent — waiting for Arc to confirm",    reassure: true,  step: "confirming the funding transaction" },
+  "syncing":         { btn: "Saving...",    label: "Saving the escrow status",                   reassure: false, step: "saving the escrow status" },
+};
+
+// Kết quả hỏng của một lượt fund. `id` để chỉ hiện trong đúng card escrow đó; `phase`
+// để câu thông báo nói được lỗi ở chặng nào; `approvedThisRun` để trấn an rằng lần bấm
+// sau sẽ không phải ký approve lần nữa.
+type FundError = {
+  id: string;
+  kind: "rejected" | "failed";
+  phase: FundPhase;
+  detail?: string;
+  approvedThisRun: boolean;
+};
+
+// User bấm Reject trong ví là hành vi bình thường, phải tách khỏi lỗi hệ thống. viem
+// bọc lỗi ví qua nhiều lớp (ContractFunctionExecutionError → TransactionExecutionError
+// → UserRejectedRequestError) nên chỉ xét lớp ngoài cùng là bỏ sót — phải đi dọc chuỗi
+// `cause`. Ví nào không dùng lớp lỗi của viem thì vẫn trả EIP-1193 code 4001.
+type ErrLink = { cause?: unknown; code?: unknown } | null | undefined;
+const isUserRejection = (e: unknown): boolean => {
+  let cur = e as ErrLink;
+  for (let depth = 0; cur && depth < 8; depth++) {
+    if (cur instanceof UserRejectedRequestError || cur.code === 4001) return true;
+    cur = cur.cause as ErrLink;
+  }
+  return false;
+};
+
+// writeContractAsync có chainId thì viem đọc chain thật của ví và ném ChainMismatchError
+// TRƯỚC khi gửi eth_sendTransaction: ví chưa bật popup, không tx nào đi lên chain khác.
+// Lỗi này bị bọc cùng kiểu với lỗi reject nên cũng phải đi dọc chuỗi `cause`.
+const isChainMismatch = (e: unknown): boolean => {
+  let cur = e as ErrLink;
+  for (let depth = 0; cur && depth < 8; depth++) {
+    if (cur instanceof ChainMismatchError) return true;
+    cur = cur.cause as ErrLink;
+  }
+  return false;
 };
 
 export default function MilestonesPage() {
-  const { address, isConnected } = useAccount();
-  const chainId = useChainId();
+  // chainId lấy từ useAccount = chain thật của ví. useChainId() chỉ nhận chain có trong
+  // config (chỉ có Arc) nên luôn ra Arc khi đã kết nối, khiến onArc không bao giờ false.
+  const { address, isConnected, chainId } = useAccount();
   const { switchChain } = useSwitchChain();
   const { signMessageAsync } = useSignMessage();
   const onArc = chainId === ARC_ID;
@@ -295,43 +344,75 @@ export default function MilestonesPage() {
   // để bấm vào xem. Cả hai reset ở đầu mỗi lượt fund.
   const [fundApproveHash, setFundApproveHash] = useState<`0x${string}` | null>(null);
   const [fundTxHash, setFundTxHash] = useState<`0x${string}` | null>(null);
+  const [fundError, setFundError] = useState<FundError | null>(null);
+  // Escrow nào vừa bị chặn vì ví đang ở sai chain (dùng chung cho fund/release/refund).
+  const [wrongNetworkId, setWrongNetworkId] = useState<string | null>(null);
 
   const TIMELOCK_SECONDS = 7 * 24 * 60 * 60; // 7-day dispute window before auto-release
 
   const fundEscrow = async (a: Agreement) => {
     if (!pc || !address) return;
+    setWrongNetworkId(null);
+    // `phase` chạy song song với state: setFundPhase là bất đồng bộ, đọc fundPhase
+    // trong catch sẽ ra giá trị cũ. Biến cục bộ này mới là chặng đúng lúc lỗi rơi.
+    let phase: FundPhase = "checking-allowance";
+    const goPhase = (p: FundPhase) => { phase = p; setFundPhase(p); };
+    // User đã ký approve thành công trong CHÍNH lượt này hay chưa — để nếu họ từ chối
+    // ở bước fund thì nói được "allowance đã set rồi, lần sau khỏi approve lại".
+    let approvedThisRun = false;
     try {
       setFundingId(a.id);
-      // Xoá hash của lượt trước, nếu không panel sẽ mở ra kèm link tx cũ.
-      setFundApproveHash(null); setFundTxHash(null);
+      // Xoá hash và lỗi của lượt trước, nếu không panel sẽ mở ra kèm link tx cũ.
+      setFundApproveHash(null); setFundTxHash(null); setFundError(null);
       const amt = parseUnits(String(a.amount_usdc), 6);
 
-      // Đặt nhãn TRƯỚC writeContractAsync: lúc này ví mới bật popup, user là người
-      // phải hành động. Chỉ khi hàm này trả về (đã ký) mới chuyển sang chờ mạng.
-      setFundPhase("approve-wallet");
-      const approveHash = await writeContractAsync({
-        address: USDC_ADDRESS, abi: USDC_APPROVE_ABI, functionName: "approve",
-        args: [TIMELOCK_ADDRESS, amt] });
-      setFundApproveHash(approveHash);
-      setFundPhase("approve-confirm");
-      await pc.waitForTransactionReceipt({ hash: approveHash });
+      // Allowance on-chain là nguồn sự thật duy nhất, không cần lưu state phía client.
+      // Nếu lượt trước user ký approve xong rồi mới reject ở bước fund, approve đó ĐÃ
+      // lên chain và đã mất gas thật — bắt ký lại lần nữa là đốt gas lần hai vô ích.
+      goPhase("checking-allowance");
+      const allowance = await pc.readContract({
+        address: USDC_ADDRESS, abi: USDC_ALLOWANCE_ABI, functionName: "allowance",
+        args: [address, TIMELOCK_ADDRESS] }) as bigint;
 
-      setFundPhase("reading-nonce");
+      if (allowance < amt) {
+        // Đặt nhãn TRƯỚC writeContractAsync: lúc này ví mới bật popup, user là người
+        // phải hành động. Chỉ khi hàm này trả về (đã ký) mới chuyển sang chờ mạng.
+        goPhase("approve-wallet");
+        const approveHash = await writeContractAsync({
+          address: USDC_ADDRESS, abi: USDC_APPROVE_ABI, functionName: "approve",
+          args: [TIMELOCK_ADDRESS, amt], chainId: ARC_ID });
+        setFundApproveHash(approveHash);
+        goPhase("approve-confirm");
+        await pc.waitForTransactionReceipt({ hash: approveHash });
+        approvedThisRun = true;
+      }
+
+      goPhase("reading-nonce");
       const idBefore = await pc.readContract({ address: TIMELOCK_ADDRESS, abi: TIMELOCK_ABI, functionName: "nonce" }) as bigint;
 
-      setFundPhase("fund-wallet");
+      goPhase("fund-wallet");
       const fundHash = await writeContractAsync({
         address: TIMELOCK_ADDRESS, abi: TIMELOCK_ABI, functionName: "fund",
-        args: [a.beneficiary_address as `0x${string}`, amt, BigInt(TIMELOCK_SECONDS)] });
+        args: [a.beneficiary_address as `0x${string}`, amt, BigInt(TIMELOCK_SECONDS)], chainId: ARC_ID });
       setFundTxHash(fundHash);
-      setFundPhase("fund-confirm");
+      goPhase("fund-confirm");
       await pc.waitForTransactionReceipt({ hash: fundHash });
       const paymentId = Number(idBefore);
 
-      setFundPhase("syncing");
+      goPhase("syncing");
       await persistAfterTx(a.id, { status: "FUNDED", payment_id: paymentId, tx_hash_fund: fundHash }, "funding", fundHash);
-    } catch (e: any) {
-      alert("Funding failed or rejected: " + (e?.shortMessage || e?.message || "unknown"));
+    } catch (e) {
+      // Sai chain: bị chặn trước khi ví bật popup, chưa có tx nào — không phải lỗi hệ thống.
+      if (isChainMismatch(e)) { setWrongNetworkId(a.id); return; }
+      // Không alert() nữa: thông báo hiện inline ngay trong card escrow đó. Từ chối ký
+      // và lỗi thật là hai chuyện khác nhau, và câu lỗi phải nêu được chặng đang chạy.
+      const err = e as { shortMessage?: string; message?: string } | null;
+      setFundError({
+        id: a.id,
+        kind: isUserRejection(e) ? "rejected" : "failed",
+        phase,
+        detail: err?.shortMessage || err?.message || undefined,
+        approvedThisRun });
     } finally {
       setFundingId(null); setFundPhase(null);
     }
@@ -344,26 +425,26 @@ export default function MilestonesPage() {
   const releasePayment = async (a: Agreement) => {
     if (!pc || a.payment_id === null || a.payment_id === undefined) return;
     try {
-      setActingId(a.id); setActStep("Releasing...");
+      setActingId(a.id); setActStep("Releasing..."); setWrongNetworkId(null);
       const hash = await writeContractAsync({
         address: TIMELOCK_ADDRESS, abi: TIMELOCK_ABI, functionName: "release",
-        args: [BigInt(a.payment_id)] });
+        args: [BigInt(a.payment_id)], chainId: ARC_ID });
       await pc.waitForTransactionReceipt({ hash });
       await persistAfterTx(a.id, { status: "RELEASED", tx_hash_release: hash }, "release", hash);
-    } catch (e: any) { alert("Release failed: " + (e?.shortMessage || e?.message || "")); }
+    } catch (e: any) { if (isChainMismatch(e)) setWrongNetworkId(a.id); else alert("Release failed: " + (e?.shortMessage || e?.message || "")); }
     finally { setActingId(null); setActStep(""); }
   };
 
   const refundEscrow = async (a: Agreement) => {
     if (!pc || a.payment_id === null || a.payment_id === undefined) return;
     try {
-      setActingId(a.id); setActStep("Refunding...");
+      setActingId(a.id); setActStep("Refunding..."); setWrongNetworkId(null);
       const hash = await writeContractAsync({
         address: TIMELOCK_ADDRESS, abi: TIMELOCK_ABI, functionName: "refund",
-        args: [BigInt(a.payment_id)] });
+        args: [BigInt(a.payment_id)], chainId: ARC_ID });
       await pc.waitForTransactionReceipt({ hash });
       await persistAfterTx(a.id, { status: "REFUNDED", tx_hash_release: hash }, "refund", hash);
-    } catch (e: any) { alert("Refund failed: " + (e?.shortMessage || e?.message || "")); }
+    } catch (e: any) { if (isChainMismatch(e)) setWrongNetworkId(a.id); else alert("Refund failed: " + (e?.shortMessage || e?.message || "")); }
     finally { setActingId(null); setActStep(""); }
   };
 
@@ -601,8 +682,12 @@ export default function MilestonesPage() {
                               {approvingId === a.id ? "Approving..." : "🤖 Approve · agent will pay"}
                             </button>
                           ) : (
-                            <button onClick={() => releasePayment(a)} disabled={actingId === a.id} style={btnPrimary}>
-                              {actingId === a.id ? actStep || "Processing..." : "Approve & Release"}
+                            <button onClick={() => releasePayment(a)} disabled={actingId === a.id || !onArc}
+                              title={!onArc ? "Switch to Arc Testnet to release this escrow" : undefined}
+                              style={{ ...btnPrimary, ...(actingId === a.id || !onArc
+                                ? { background: "#EBF2FD", color: "#9BB5C8", cursor: actingId === a.id ? "wait" : "not-allowed" }
+                                : {}) }}>
+                              {actingId === a.id ? actStep || "Processing..." : !onArc ? "Switch network to release" : "Approve & Release"}
                             </button>
                           )
                         )}
@@ -616,13 +701,23 @@ export default function MilestonesPage() {
                             hatch, a watcher that never fires leaves the escrow stuck until the
                             7-day deadline — too risky to rely on during a live demo. */}
                         {dep && a.status === "APPROVED" && a.payment_id !== null && (
-                          <button onClick={() => releasePayment(a)} disabled={actingId === a.id} style={btnGhost}>
-                            {actingId === a.id ? actStep || "Processing..." : "Release now (manual fallback)"}
+                          <button onClick={() => releasePayment(a)} disabled={actingId === a.id || !onArc}
+                            title={!onArc ? "Switch to Arc Testnet to release this escrow" : undefined}
+                            style={{ ...btnGhost, ...(actingId === a.id || !onArc
+                              ? { border: "1px solid #E2EAF8", color: "#9BB5C8", cursor: actingId === a.id ? "wait" : "not-allowed" }
+                              : {}) }}>
+                            {actingId === a.id ? actStep || "Processing..." : !onArc ? "Switch network to release" : "Release now (manual fallback)"}
                           </button>
                         )}
 
                         {isArbiter && a.payment_id !== null && (a.status === "FUNDED" || a.status === "SUBMITTED") && (
-                          <button onClick={() => refundEscrow(a)} disabled={actingId === a.id} style={btnDanger}>{actingId === a.id ? actStep || "Processing..." : "Refund to depositor"}</button>
+                          <button onClick={() => refundEscrow(a)} disabled={actingId === a.id || !onArc}
+                            title={!onArc ? "Switch to Arc Testnet to refund this escrow" : undefined}
+                            style={{ ...btnDanger, ...(actingId === a.id || !onArc
+                              ? { border: "1px solid #E2EAF8", color: "#9BB5C8", cursor: actingId === a.id ? "wait" : "not-allowed" }
+                              : {}) }}>
+                            {actingId === a.id ? actStep || "Processing..." : !onArc ? "Switch network to refund" : "Refund to depositor"}
+                          </button>
                         )}
                         {(a.status === "RELEASED" || a.status === "REFUNDED") && (
                           <span style={{ ...M, fontSize: 15, fontWeight: 600, color: "#3B5878" }}>
@@ -669,6 +764,52 @@ export default function MilestonesPage() {
                             </div>
                           )}
                         </div>
+                      )}
+
+                      {wrongNetworkId === a.id && (
+                        // Sai chain không phải sự cố: chưa tx nào được gửi. Tone trung tính như nhánh
+                        // từ chối ký, và cố ý không có câu trấn an "funds are safe".
+                        <div style={{ marginTop: 14, background: "#F4F7FD", border: "1px solid #E2EAF8", borderRadius: 12, padding: "12px 14px" }}>
+                          <div style={{ ...M, fontSize: 13, fontWeight: 700, color: "#3B5878", lineHeight: 1.6 }}>
+                            Wrong network — switch to Arc Testnet
+                          </div>
+                        </div>
+                      )}
+
+                      {fundError?.id === a.id && !funding && (
+                        fundError.kind === "rejected" ? (
+                          // Từ chối ký là lựa chọn hợp lệ của user, không phải sự cố:
+                          // giữ tone trung tính, dùng palette nền của trang, không tô đỏ.
+                          <div style={{ marginTop: 14, background: "#F4F7FD", border: "1px solid #E2EAF8", borderRadius: 12, padding: "12px 14px" }}>
+                            <div style={{ ...M, fontSize: 13, fontWeight: 700, color: "#3B5878", lineHeight: 1.6 }}>
+                              Cancelled in your wallet — nothing was sent for that step. Press
+                              “Fund Escrow” again whenever you’re ready.
+                            </div>
+                            {fundError.approvedThisRun && (
+                              <div style={{ ...M, fontSize: 13, fontWeight: 600, color: "#6B8DB8", marginTop: 8, lineHeight: 1.6 }}>
+                                Your USDC approval did go through, so the allowance is already set —
+                                the next attempt goes straight to funding and you won’t approve twice.
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          // Lỗi thật: cùng phong cách cảnh báo với banner "Retry sync".
+                          <div style={{ marginTop: 14, background: "#FFF7ED", border: "2px solid #F59E0B", borderRadius: 12, padding: "12px 14px" }}>
+                            <div style={{ ...M, fontSize: 13, fontWeight: 700, color: "#B45309", lineHeight: 1.6 }}>
+                              ⚠️ Funding stopped at {FUND_PHASE[fundError.phase].step}.
+                            </div>
+                            {fundError.detail && (
+                              <div style={{ ...M, fontSize: 12, fontWeight: 600, color: "#B45309", opacity: 0.85, marginTop: 8, lineHeight: 1.6, wordBreak: "break-word" }}>
+                                {fundError.detail}
+                              </div>
+                            )}
+                            {fundError.approvedThisRun && (
+                              <div style={{ ...M, fontSize: 12, fontWeight: 600, color: "#B45309", opacity: 0.85, marginTop: 8, lineHeight: 1.6 }}>
+                                Your USDC approval already landed on Arc, so retrying skips the approval step.
+                              </div>
+                            )}
+                          </div>
+                        )
                       )}
 
                       {deliverableEditId === a.id && (
