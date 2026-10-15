@@ -146,6 +146,9 @@ type FundError = {
   kind: "rejected" | "failed";
   phase: FundPhase;
   detail?: string;
+  // Hash của tx fund ĐÃ gửi trong chính lượt hỏng đó, nếu đã kịp gửi. Gắn vào đây thay vì
+  // đọc state chung: hai lượt fund chạy chồng nhau thì state chung là của lượt khác.
+  hash?: string;
   approvedThisRun: boolean;
 };
 
@@ -347,6 +350,10 @@ export default function MilestonesPage() {
   const [fundError, setFundError] = useState<FundError | null>(null);
   // Escrow nào vừa bị chặn vì ví đang ở sai chain (dùng chung cho fund/release/refund).
   const [wrongNetworkId, setWrongNetworkId] = useState<string | null>(null);
+  // Về lại Arc thì DỌN state cảnh báo sai chain, chứ không ẩn nó ở chỗ render: banner chỉ
+  // sinh ra khi app tưởng đang ở Arc mà ví thì không, nên gate render bằng onArc sẽ giấu
+  // banner đúng ca cần hiện nhất.
+  useEffect(() => { if (onArc) setWrongNetworkId(null); }, [onArc]);
 
   const TIMELOCK_SECONDS = 7 * 24 * 60 * 60; // 7-day dispute window before auto-release
 
@@ -360,6 +367,9 @@ export default function MilestonesPage() {
     // User đã ký approve thành công trong CHÍNH lượt này hay chưa — để nếu họ từ chối
     // ở bước fund thì nói được "allowance đã set rồi, lần sau khỏi approve lại".
     let approvedThisRun = false;
+    // Hash của lượt NÀY. Không đọc state fundTxHash trong catch: state trong closure là
+    // giá trị lúc bấm nút, tức của lượt trước, nên sẽ hiện nhầm hash của escrow khác.
+    let sentFundHash: `0x${string}` | null = null;
     try {
       setFundingId(a.id);
       // Xoá hash và lỗi của lượt trước, nếu không panel sẽ mở ra kèm link tx cũ.
@@ -394,7 +404,7 @@ export default function MilestonesPage() {
       const fundHash = await writeContractAsync({
         address: TIMELOCK_ADDRESS, abi: TIMELOCK_ABI, functionName: "fund",
         args: [a.beneficiary_address as `0x${string}`, amt, BigInt(TIMELOCK_SECONDS)], chainId: ARC_ID });
-      setFundTxHash(fundHash);
+      setFundTxHash(fundHash); sentFundHash = fundHash;
       goPhase("fund-confirm");
       await pc.waitForTransactionReceipt({ hash: fundHash });
       const paymentId = Number(idBefore);
@@ -412,6 +422,7 @@ export default function MilestonesPage() {
         kind: isUserRejection(e) ? "rejected" : "failed",
         phase,
         detail: err?.shortMessage || err?.message || undefined,
+        hash: sentFundHash ?? undefined,
         approvedThisRun });
     } finally {
       setFundingId(null); setFundPhase(null);
@@ -801,6 +812,18 @@ export default function MilestonesPage() {
                             {fundError.detail && (
                               <div style={{ ...M, fontSize: 12, fontWeight: 600, color: "#B45309", opacity: 0.85, marginTop: 8, lineHeight: 1.6, wordBreak: "break-word" }}>
                                 {fundError.detail}
+                              </div>
+                            )}
+                            {/* Hash lấy từ chính lượt hỏng (fundError.hash), không phải state chung:
+                                panel tiến trình đã bị gỡ theo fundingId nên đây là chỗ duy nhất còn
+                                hiện được link, và nó phải là tx của đúng escrow này. */}
+                            {fundError.hash && (
+                              <div style={{ ...M, fontSize: 12, fontWeight: 700, color: "#B45309", marginTop: 8, lineHeight: 1.6, wordBreak: "break-word" }}>
+                                A fund transaction was already sent:{" "}
+                                <a href={`https://testnet.arcscan.app/tx/${fundError.hash}`} target="_blank" rel="noopener noreferrer" style={{ color: "#B45309" }}>
+                                  {fundError.hash.slice(0, 10)}… ↗
+                                </a>
+                                {" "}— this escrow may already be funded; verify on ArcScan before funding again.
                               </div>
                             )}
                             {fundError.approvedThisRun && (
