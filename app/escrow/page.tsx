@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useAccount, useReadContract, useSwitchChain, useWriteContract, usePublicClient, useSignMessage } from "wagmi";
-import { parseUnits, isAddress, UserRejectedRequestError, ChainMismatchError } from "viem";
+import { parseUnits, isAddress, parseEventLogs, UserRejectedRequestError, ChainMismatchError } from "viem";
 import { TIMELOCK_ADDRESS, USDC_ADDRESS, TIMELOCK_ABI, USDC_APPROVE_ABI } from "../../lib/timelockEscrow";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import Layout from "../components/Layout";
@@ -113,13 +113,11 @@ const STATUS_STYLE: Record<string, { bg: string; color: string; label: string }>
 // Các chặng của một lượt fund. Tách riêng "ví đang chờ user bấm" với "đã gửi lên
 // chain, đang chờ confirm": hai lần chờ này đòi user làm hai việc khác hẳn nhau
 // (một bên phải thao tác, một bên chỉ cần ngồi yên), gộp chung một label như bản
-// cũ là nói dối người dùng. Bước đọc nonce không có tx nào nên cũng phải có nhãn
-// riêng, nếu không nó hiện nhầm là đang chờ ví.
+// cũ là nói dối người dùng.
 type FundPhase =
   | "checking-allowance"
   | "approve-wallet"
   | "approve-confirm"
-  | "reading-nonce"
   | "fund-wallet"
   | "fund-confirm"
   | "syncing";
@@ -132,7 +130,6 @@ const FUND_PHASE: Record<FundPhase, { btn: string; label: string; reassure: bool
   "checking-allowance": { btn: "Checking...",  label: "Checking the USDC allowance you already gave", reassure: false, step: "checking your USDC allowance" },
   "approve-wallet":  { btn: "Approving...", label: "Confirm the USDC approval in your wallet",   reassure: false, step: "the USDC approval" },
   "approve-confirm": { btn: "Approving...", label: "Approval sent — waiting for Arc to confirm", reassure: true,  step: "confirming the USDC approval" },
-  "reading-nonce":   { btn: "Preparing...", label: "Reading the next escrow ID from the contract", reassure: false, step: "reading the next escrow ID" },
   "fund-wallet":     { btn: "Funding...",   label: "Confirm the funding transaction in your wallet", reassure: false, step: "the funding transaction" },
   "fund-confirm":    { btn: "Funding...",   label: "Funds sent — waiting for Arc to confirm",    reassure: true,  step: "confirming the funding transaction" },
   "syncing":         { btn: "Saving...",    label: "Saving the escrow status",                   reassure: false, step: "saving the escrow status" },
@@ -149,6 +146,9 @@ type FundError = {
   // Hash của tx fund ĐÃ gửi trong chính lượt hỏng đó, nếu đã kịp gửi. Gắn vào đây thay vì
   // đọc state chung: hai lượt fund chạy chồng nhau thì state chung là của lượt khác.
   hash?: string;
+  // Tx fund đã lên chain nhưng REVERT: không có escrow nào được tạo, số tiền escrow không
+  // bị trừ (chỉ mất gas). Khác hẳn ca "đã gửi, chưa rõ kết quả" nên câu hiển thị phải khác.
+  reverted?: boolean;
   approvedThisRun: boolean;
 };
 
@@ -370,6 +370,9 @@ export default function MilestonesPage() {
     // Hash của lượt NÀY. Không đọc state fundTxHash trong catch: state trong closure là
     // giá trị lúc bấm nút, tức của lượt trước, nên sẽ hiện nhầm hash của escrow khác.
     let sentFundHash: `0x${string}` | null = null;
+    // Bật khi receipt có status khác success — để panel lỗi nói "tx đã revert" thay vì
+    // "có thể đã fund rồi".
+    let fundReverted = false;
     try {
       setFundingId(a.id);
       // Xoá hash và lỗi của lượt trước, nếu không panel sẽ mở ra kèm link tx cũ.
@@ -397,17 +400,28 @@ export default function MilestonesPage() {
         approvedThisRun = true;
       }
 
-      goPhase("reading-nonce");
-      const idBefore = await pc.readContract({ address: TIMELOCK_ADDRESS, abi: TIMELOCK_ABI, functionName: "nonce" }) as bigint;
-
       goPhase("fund-wallet");
       const fundHash = await writeContractAsync({
         address: TIMELOCK_ADDRESS, abi: TIMELOCK_ABI, functionName: "fund",
         args: [a.beneficiary_address as `0x${string}`, amt, BigInt(TIMELOCK_SECONDS)], chainId: ARC_ID });
       setFundTxHash(fundHash); sentFundHash = fundHash;
       goPhase("fund-confirm");
-      await pc.waitForTransactionReceipt({ hash: fundHash });
-      const paymentId = Number(idBefore);
+      const receipt = await pc.waitForTransactionReceipt({ hash: fundHash });
+      // waitForTransactionReceipt KHÔNG ném lỗi khi tx revert — nó trả receipt status
+      // "reverted". Không kiểm ở đây là ghi FUNDED cho một escrow không tồn tại (dòng
+      // ee4a2e3f…: tx revert ở block 55652747 mà DB vẫn thành FUNDED).
+      if (receipt.status !== "success") {
+        fundReverted = true;
+        throw new Error("The fund transaction reverted on-chain. No escrow was created and the escrow amount was not taken; only gas (paid in USDC) was spent.");
+      }
+      // ID lấy từ event EscrowFunded của chính tx này, không từ nonce() đọc trước: một
+      // fund() khác chen vào giữa sẽ làm nonce đọc trước sai.
+      const funded = parseEventLogs({ abi: TIMELOCK_ABI, eventName: "EscrowFunded", logs: receipt.logs })
+        .filter(l => l.address.toLowerCase() === TIMELOCK_ADDRESS.toLowerCase());
+      if (funded.length !== 1) {
+        throw new Error(`Expected exactly 1 EscrowFunded event in the fund transaction, found ${funded.length}. The escrow was not saved.`);
+      }
+      const paymentId = Number(funded[0].args.id);
 
       goPhase("syncing");
       await persistAfterTx(a.id, { status: "FUNDED", payment_id: paymentId, tx_hash_fund: fundHash }, "funding", fundHash);
@@ -423,6 +437,7 @@ export default function MilestonesPage() {
         phase,
         detail: err?.shortMessage || err?.message || undefined,
         hash: sentFundHash ?? undefined,
+        reverted: fundReverted,
         approvedThisRun });
     } finally {
       setFundingId(null); setFundPhase(null);
@@ -819,11 +834,13 @@ export default function MilestonesPage() {
                                 hiện được link, và nó phải là tx của đúng escrow này. */}
                             {fundError.hash && (
                               <div style={{ ...M, fontSize: 12, fontWeight: 700, color: "#B45309", marginTop: 8, lineHeight: 1.6, wordBreak: "break-word" }}>
-                                A fund transaction was already sent:{" "}
+                                {fundError.reverted ? "The fund transaction reverted:" : "A fund transaction was already sent:"}{" "}
                                 <a href={`https://testnet.arcscan.app/tx/${fundError.hash}`} target="_blank" rel="noopener noreferrer" style={{ color: "#B45309" }}>
                                   {fundError.hash.slice(0, 10)}… ↗
                                 </a>
-                                {" "}— this escrow may already be funded; verify on ArcScan before funding again.
+                                {fundError.reverted
+                                  ? " — this escrow was not funded. Common causes: insufficient USDC balance or allowance. Fix that, then fund again."
+                                  : " — this escrow may already be funded; verify on ArcScan before funding again."}
                               </div>
                             )}
                             {fundError.approvedThisRun && (

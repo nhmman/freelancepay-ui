@@ -2,12 +2,17 @@
 // trong persistAfterTx() ở browser.
 //
 // ⚠️ Không xác thực người gọi, cùng lý do đã ghi ở app/api/escrow/create/route.ts.
-// Route này không đòi chữ ký vì nó chỉ chép lại một sự việc ĐÃ xảy ra trên chain.
+// Route này không đòi chữ ký. Với FUNDED, route KHÔNG tin client: tự đọc receipt trên
+// chain (lib/verifyFundTx.ts), đối chiếu với depositor/beneficiary/amount/contract/chain
+// của chính dòng trong DB, và lấy payment_id từ event EscrowFunded. payment_id client gửi
+// lên bị bỏ qua. RELEASED/REFUNDED vẫn chép lại tx hash client gửi, chưa kiểm on-chain.
 //
 // PHẢI idempotent: nút "Retry sync" trên trang escrow gọi lại đúng payload cũ sau khi
 // lần ghi đầu fail, và lần fail đó có thể là mất response chứ không phải mất ghi. Gọi
 // hai lần phải cho cùng một kết quả, không được đá ra lỗi làm người dùng tưởng tiền kẹt.
+import { parseUnits } from "viem";
 import { getSupabaseAdmin, SupabaseConfigError } from "../../../../lib/supabaseAdmin";
+import { verifyFundTx } from "../../../../lib/verifyFundTx";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -45,16 +50,14 @@ export async function POST(request: Request) {
   let hashColumn: "tx_hash_fund" | "tx_hash_release";
   let hashValue: string;
 
+  // payment_id client gửi chỉ dùng để so với event và cảnh báo; KHÔNG ghi vào DB.
+  let clientPaymentId: number | null = null;
   if (status === "FUNDED") {
-    const paymentId = typeof fields.payment_id === "number" ? fields.payment_id : NaN;
     const txHashFund = typeof fields.tx_hash_fund === "string" ? fields.tx_hash_fund : "";
-    if (!Number.isInteger(paymentId) || paymentId < 0) {
-      return Response.json({ ok: false, error: "payment_id must be a non-negative integer" }, { status: 400 });
-    }
     if (!TX_HASH.test(txHashFund)) {
       return Response.json({ ok: false, error: "tx_hash_fund is not a tx hash" }, { status: 400 });
     }
-    update.payment_id = paymentId;
+    if (typeof fields.payment_id === "number" && Number.isInteger(fields.payment_id)) clientPaymentId = fields.payment_id;
     update.tx_hash_fund = txHashFund;
     hashColumn = "tx_hash_fund";
     hashValue = txHashFund;
@@ -84,11 +87,18 @@ export async function POST(request: Request) {
     );
   }
 
-  const { data: row, error: readError } = await admin
+  // FUNDED cần thêm các cột để đối chiếu với event on-chain.
+  const fundColumns = status === "FUNDED"
+    ? ", depositor_address, beneficiary_address, amount_usdc, contract_address, chain_id"
+    : "";
+  // Khai kiểu string: chuỗi ghép từ union làm parser kiểu của supabase-js báo ParserError.
+  const selectColumns: string = `id, status, ${hashColumn}${fundColumns}`;
+  const { data: rowData, error: readError } = await admin
     .from("escrow_agreements")
-    .select(`id, status, ${hashColumn}`)
+    .select(selectColumns)
     .eq("id", id)
     .maybeSingle();
+  const row = rowData as unknown as ({ status: string } & Record<string, unknown>) | null;
   if (readError) return Response.json({ ok: false, error: readError.message }, { status: 500 });
   if (!row) return Response.json({ ok: false, error: "escrow not found" }, { status: 404 });
 
@@ -97,6 +107,57 @@ export async function POST(request: Request) {
   const current = (row as Record<string, unknown>)[hashColumn];
   if (row.status === status && typeof current === "string" && current.toLowerCase() === hashValue.toLowerCase()) {
     return Response.json({ ok: true, idempotent: true });
+  }
+
+  let warning: string | undefined;
+  if (status === "FUNDED") {
+    const r = row as unknown as {
+      status: string; depositor_address: string; beneficiary_address: string;
+      amount_usdc: number; contract_address: string; chain_id: number;
+    };
+    // Chỉ DRAFT mới được fund. Dòng đã FUNDED/SUBMITTED/… mà nhận một tx khác là dấu hiệu
+    // gán nhầm hoặc phát lại tx của escrow khác.
+    if (r.status !== "DRAFT") {
+      return Response.json({ ok: false, error: `escrow is ${r.status}, only DRAFT can become FUNDED` }, { status: 409 });
+    }
+    let amountUnits: bigint;
+    try {
+      amountUnits = parseUnits(String(r.amount_usdc), 6);
+    } catch {
+      return Response.json({ ok: false, error: "amount_usdc in the database cannot be converted to USDC units" }, { status: 422 });
+    }
+    // Expected lấy TỪ DÒNG DB, không từ client.
+    const v = await verifyFundTx(hashValue as `0x${string}`, {
+      contract: r.contract_address, chainId: r.chain_id,
+      depositor: r.depositor_address, beneficiary: r.beneficiary_address, amountUnits,
+    });
+    if (!v.ok) {
+      return v.retryable
+        ? Response.json({ ok: false, retryable: true, error: `Could not read the fund transaction from the chain yet. Nothing was saved. Retry sync. (${v.reason})` }, { status: 503 })
+        : Response.json({ ok: false, retryable: false, error: `fund transaction rejected: ${v.reason}` }, { status: 422 });
+    }
+    update.payment_id = v.paymentId;
+    if (clientPaymentId !== null && clientPaymentId !== v.paymentId) {
+      warning = `client sent payment_id ${clientPaymentId}, the EscrowFunded event says ${v.paymentId}; stored ${v.paymentId}`;
+    }
+  }
+
+  if (status === "FUNDED") {
+    // Kèm .eq("status","DRAFT") để Postgres chặn hai request chen nhau giữa lúc đọc và lúc
+    // ghi. .select("id") để biết có đúng một dòng được ghi.
+    const { data: written, error: fundError } = await admin
+      .from("escrow_agreements").update(update).eq("id", id).eq("status", "DRAFT").select("id");
+    if (fundError) {
+      // 23505 = unique_violation: (chain_id, contract_address, payment_id) đã thuộc dòng khác.
+      if (fundError.code === "23505") {
+        return Response.json({ ok: false, error: "this on-chain escrow is already linked to another row" }, { status: 409 });
+      }
+      return Response.json({ ok: false, error: fundError.message }, { status: 500 });
+    }
+    if (!written || written.length === 0) {
+      return Response.json({ ok: false, error: "escrow changed status — reload and try again" }, { status: 409 });
+    }
+    return Response.json(warning ? { ok: true, warning } : { ok: true });
   }
 
   const { error: updateError } = await admin.from("escrow_agreements").update(update).eq("id", id);
